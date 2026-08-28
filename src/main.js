@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:9191/api";
+﻿const API_BASE = "http://localhost:9191/api";
 const app = document.querySelector("#app");
 
 const state = {
@@ -169,11 +169,11 @@ function printRecord(title, record) {
             </div>
             <div class="sub">${new Date().toLocaleString()}</div>
           </div>
-          <div class="row"><div class="label">Record No</div><div class="value">${record.quoteNo || record.paymentNo || record.invoiceNo || record._id || "—"}</div></div>
-          <div class="row"><div class="label">Lead</div><div class="value">${record.leadName || record.customerName || "—"}</div></div>
-          <div class="row"><div class="label">Mobile</div><div class="value">${record.phone || record.mobile || "—"}</div></div>
-          <div class="row"><div class="label">Amount</div><div class="amount">₹${Number(amount || 0).toLocaleString("en-IN")}</div></div>
-          <div class="row"><div class="label">Notes</div><div class="value">${record.note || "—"}</div></div>
+          <div class="row"><div class="label">Record No</div><div class="value">${record.quoteNo || record.paymentNo || record.invoiceNo || record._id || "â€”"}</div></div>
+          <div class="row"><div class="label">Lead</div><div class="value">${record.leadName || record.customerName || "â€”"}</div></div>
+          <div class="row"><div class="label">Mobile</div><div class="value">${record.phone || record.mobile || "â€”"}</div></div>
+          <div class="row"><div class="label">Amount</div><div class="amount">â‚¹${Number(amount || 0).toLocaleString("en-IN")}</div></div>
+          <div class="row"><div class="label">Notes</div><div class="value">${record.note || "â€”"}</div></div>
         </div>
         <script>window.print();</script>
       </body>
@@ -276,7 +276,7 @@ function activityCardMarkup(items, labelKey, amountKey, recordType) {
   return items.map((item) => `
     <div class="card" style="margin-top:10px">
       <strong>${item[labelKey] || item.quoteNo || item.paymentNo || item.invoiceNo || "Record"}</strong>
-      <div class="muted">₹${Number(item[amountKey] || 0).toLocaleString("en-IN")}</div>
+      <div class="muted">â‚¹${Number(item[amountKey] || 0).toLocaleString("en-IN")}</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
         <button class="btn btn-soft" data-print="${recordType}:${item._id}">Print</button>
       </div>
@@ -289,7 +289,6 @@ function openRecordModal(type) {
     quote: {
       title: "Create Quote",
       fields: [
-        { name: "leadId", label: "Lead ID", type: "text" },
         { name: "quoteNo", label: "Quote No", type: "text" },
         { name: "totalAmount", label: "Total Amount", type: "number" },
         { name: "gstAmount", label: "GST Amount", type: "number" },
@@ -302,7 +301,6 @@ function openRecordModal(type) {
     payment: {
       title: "Create Payment",
       fields: [
-        { name: "leadId", label: "Lead ID", type: "text" },
         { name: "paymentNo", label: "Payment No", type: "text" },
         { name: "paidAmount", label: "Paid Amount", type: "number" },
         { name: "paymentMode", label: "Payment Mode", type: "text" },
@@ -314,7 +312,6 @@ function openRecordModal(type) {
     gst: {
       title: "Create GST Invoice",
       fields: [
-        { name: "leadId", label: "Lead ID", type: "text" },
         { name: "invoiceNo", label: "Invoice No", type: "text" },
         { name: "taxableAmount", label: "Taxable Amount", type: "number" },
         { name: "gstAmount", label: "GST Amount", type: "number" },
@@ -325,11 +322,13 @@ function openRecordModal(type) {
       method: "POST",
     },
   }[type];
+  const leadOptions = state.leads.map((lead) => `<option value="${lead._id}">${lead.customerName} • ${lead.phone}</option>`).join("");
   const host = modal(`
     <form id="recordForm">
       <div class="modal-head"><h3>${config.title}</h3><button type="button" class="modal-close" data-close>Close</button></div>
       <div class="grid two">
-        ${config.fields.map((f) => `<div class="field" style="${f.type === "textarea" ? "grid-column:1/-1" : ""}"><label>${f.label}</label>${f.type === "textarea" ? `<textarea name="${f.name}"></textarea>` : `<input name="${f.name}" type="${f.type}" />`}</div>`).join("")}
+        <div class="field" style="grid-column:1/-1"><label>Lead</label><select name="leadId" required><option value="">Select lead</option>${leadOptions}</select></div>
+        ${config.fields.filter((f) => f.name !== "leadId").map((f) => `<div class="field" style="${f.type === "textarea" ? "grid-column:1/-1" : ""}"><label>${f.label}</label>${f.type === "textarea" ? `<textarea name="${f.name}"></textarea>` : `<input name="${f.name}" type="${f.type}" />`}</div>`).join("")}
       </div>
       <div style="margin-top:14px;display:flex;justify-content:flex-end;gap:10px">
         <button class="btn btn-soft" type="button" data-close>Cancel</button>
@@ -345,6 +344,10 @@ function openRecordModal(type) {
     Object.entries(body).forEach(([k, v]) => { if (v !== "") payload[k] = /^\d+(\.\d+)?$/.test(v) ? Number(v) : v; });
     const leadId = payload.leadId;
     delete payload.leadId;
+    if (!leadId) {
+      toast("Please select a lead", "error");
+      return;
+    }
     await api(`${config.endpoint}/${leadId}`, { method: config.method, body: JSON.stringify(payload) });
     toast(`${config.title} saved`);
     closeModal(host);
@@ -492,11 +495,11 @@ function leadDetails(lead) {
     <div class="detail-grid">
       <div class="card">
         <div class="grid two">
-          <div><div class="muted">Phone</div><strong>${lead.phone || "—"}</strong></div>
-          <div><div class="muted">Area</div><strong>${lead.area || "—"}</strong></div>
-          <div><div class="muted">Locality</div><strong>${lead.locality || "—"}</strong></div>
+          <div><div class="muted">Phone</div><strong>${lead.phone || "â€”"}</strong></div>
+          <div><div class="muted">Area</div><strong>${lead.area || "â€”"}</strong></div>
+          <div><div class="muted">Locality</div><strong>${lead.locality || "â€”"}</strong></div>
           <div><div class="muted">Monthly Bill</div><strong>${lead.monthlyBill || 0}</strong></div>
-          <div><div class="muted">Source</div><strong>${lead.source || "—"}</strong></div>
+          <div><div class="muted">Source</div><strong>${lead.source || "â€”"}</strong></div>
           <div><div class="muted">Status</div><span class="pill ${statusPill(lead.status || "active")}">${lead.status || "active"}</span></div>
         </div>
         <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
@@ -630,9 +633,9 @@ function render() {
             </div>
             ${renderTable(state.leads.map(l => `
               <tr>
-                <td><strong>${l.customerName}</strong><div class="muted">${l.area || "—"} ${l.locality ? "• " + l.locality : ""}</div></td>
+                <td><strong>${l.customerName}</strong><div class="muted">${l.area || "â€”"} ${l.locality ? "â€¢ " + l.locality : ""}</div></td>
                 <td>${l.phone}</td>
-                <td>${l.source || "—"}</td>
+                <td>${l.source || "â€”"}</td>
                 <td><span class="pill ${statusPill(l.status)}">${l.status || "active"}</span></td>
                 <td><span class="pill ${pillFor(l.leadStatus)}">${l.leadStatus}</span></td>
                 <td><button class="btn btn-soft" data-open="${l._id}">Open</button></td>
@@ -665,13 +668,13 @@ function render() {
             </div>
             <div class="grid two" style="margin-top:14px">
               <div class="card"><h3 style="margin-top:0">GST Invoices</h3>${state.gst.length ? activityCardMarkup(state.gst, "invoiceNo", "taxableAmount", "gst") : "<div class='empty'>No GST invoices</div>"}</div>
-              <div class="card"><h3 style="margin-top:0">Meetings</h3>${state.meetings.map(m => `<div class="card" style="margin-top:10px"><strong>${m.leadName || m.customerName || "Lead"}</strong><div class="muted">${m.meetingDate || "�"} ${m.meetingTime || ""}</div></div>`).join("") || "<div class='empty'>No meetings</div>"}</div>
+              <div class="card"><h3 style="margin-top:0">Meetings</h3>${state.meetings.map(m => `<div class="card" style="margin-top:10px"><strong>${m.leadName || m.customerName || "Lead"}</strong><div class="muted">${m.meetingDate || "—"} ${m.meetingTime || ""}</div></div>`).join("") || "<div class='empty'>No meetings</div>"}</div>
             </div>
           ` : ""}
           ${state.view === "audits" ? renderTable(state.audits.map(a => `
             <tr>
               <td><strong>${a.action}</strong><div class="muted">${a.entityType}</div></td>
-              <td>${a.entityId || "—"}</td>
+              <td>${a.entityId || "â€”"}</td>
               <td>${new Date(a.createdAt).toLocaleString()}</td>
             </tr>
           `).join(""), ["Action","Entity","Time"], 3, "No audit logs") : ""}
@@ -734,4 +737,6 @@ async function logout() {
   }
   render();
 })();
+
+
 
