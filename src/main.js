@@ -140,6 +140,48 @@ async function uploadFile(file, folder = "zengrid") {
   return api("/media/single", { method: "POST", body: form });
 }
 
+function printRecord(title, record) {
+  const w = window.open("", "_blank", "width=900,height=1100");
+  const amount = record.netEffectivePrice ?? record.paidAmount ?? record.taxableAmount ?? 0;
+  w.document.write(`
+    <html>
+      <head>
+        <title>${title}</title>
+        <style>
+          body{font-family:Arial,sans-serif;margin:0;padding:24px;background:#f6f1e8;color:#0f172a}
+          .sheet{max-width:860px;margin:0 auto;background:#fff;border:1px solid #dbe1ea;border-radius:18px;padding:24px}
+          .head{display:flex;justify-content:space-between;gap:20px;border-bottom:2px solid #1f3a8a;padding-bottom:16px;margin-bottom:18px}
+          .brand{font-size:22px;font-weight:800;color:#1f3a8a}
+          .sub{color:#64748b;font-size:13px}
+          .row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px dashed #e5e7eb}
+          .label{color:#64748b}
+          .value{font-weight:700}
+          .amount{font-size:24px;font-weight:800;color:#6b4fd3}
+          @media print{body{background:#fff}.sheet{border:none;padding:0}}
+        </style>
+      </head>
+      <body>
+        <div class="sheet">
+          <div class="head">
+            <div>
+              <div class="brand">ZenGrid ${title}</div>
+              <div class="sub">${record.leadName || record.customerName || "Lead Record"}</div>
+            </div>
+            <div class="sub">${new Date().toLocaleString()}</div>
+          </div>
+          <div class="row"><div class="label">Record No</div><div class="value">${record.quoteNo || record.paymentNo || record.invoiceNo || record._id || "—"}</div></div>
+          <div class="row"><div class="label">Lead</div><div class="value">${record.leadName || record.customerName || "—"}</div></div>
+          <div class="row"><div class="label">Mobile</div><div class="value">${record.phone || record.mobile || "—"}</div></div>
+          <div class="row"><div class="label">Amount</div><div class="amount">₹${Number(amount || 0).toLocaleString("en-IN")}</div></div>
+          <div class="row"><div class="label">Notes</div><div class="value">${record.note || "—"}</div></div>
+        </div>
+        <script>window.print();</script>
+      </body>
+    </html>
+  `);
+  w.document.close();
+}
+
 function modal(content) {
   const host = document.createElement("div");
   host.className = "modal-backdrop";
@@ -228,6 +270,86 @@ function rolePill(role) {
 
 function statusPill(status) {
   return status === "active" ? "green" : status === "blocked" ? "red" : "beige";
+}
+
+function activityCardMarkup(items, labelKey, amountKey, recordType) {
+  return items.map((item) => `
+    <div class="card" style="margin-top:10px">
+      <strong>${item[labelKey] || item.quoteNo || item.paymentNo || item.invoiceNo || "Record"}</strong>
+      <div class="muted">₹${Number(item[amountKey] || 0).toLocaleString("en-IN")}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+        <button class="btn btn-soft" data-print="${recordType}:${item._id}">Print</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+function openRecordModal(type) {
+  const config = {
+    quote: {
+      title: "Create Quote",
+      fields: [
+        { name: "leadId", label: "Lead ID", type: "text" },
+        { name: "quoteNo", label: "Quote No", type: "text" },
+        { name: "totalAmount", label: "Total Amount", type: "number" },
+        { name: "gstAmount", label: "GST Amount", type: "number" },
+        { name: "netEffectivePrice", label: "Net Effective Price", type: "number" },
+        { name: "note", label: "Note", type: "textarea" },
+      ],
+      endpoint: "/activities/quotes",
+      method: "POST",
+    },
+    payment: {
+      title: "Create Payment",
+      fields: [
+        { name: "leadId", label: "Lead ID", type: "text" },
+        { name: "paymentNo", label: "Payment No", type: "text" },
+        { name: "paidAmount", label: "Paid Amount", type: "number" },
+        { name: "paymentMode", label: "Payment Mode", type: "text" },
+        { name: "note", label: "Note", type: "textarea" },
+      ],
+      endpoint: "/activities/payments",
+      method: "POST",
+    },
+    gst: {
+      title: "Create GST Invoice",
+      fields: [
+        { name: "leadId", label: "Lead ID", type: "text" },
+        { name: "invoiceNo", label: "Invoice No", type: "text" },
+        { name: "taxableAmount", label: "Taxable Amount", type: "number" },
+        { name: "gstAmount", label: "GST Amount", type: "number" },
+        { name: "invoiceDate", label: "Invoice Date", type: "date" },
+        { name: "note", label: "Note", type: "textarea" },
+      ],
+      endpoint: "/activities/gst",
+      method: "POST",
+    },
+  }[type];
+  const host = modal(`
+    <form id="recordForm">
+      <div class="modal-head"><h3>${config.title}</h3><button type="button" class="modal-close" data-close>Close</button></div>
+      <div class="grid two">
+        ${config.fields.map((f) => `<div class="field" style="${f.type === "textarea" ? "grid-column:1/-1" : ""}"><label>${f.label}</label>${f.type === "textarea" ? `<textarea name="${f.name}"></textarea>` : `<input name="${f.name}" type="${f.type}" />`}</div>`).join("")}
+      </div>
+      <div style="margin-top:14px;display:flex;justify-content:flex-end;gap:10px">
+        <button class="btn btn-soft" type="button" data-close>Cancel</button>
+        <button class="btn btn-primary" type="submit">Save</button>
+      </div>
+    </form>
+  `);
+  host.querySelectorAll("[data-close]").forEach((el) => (el.onclick = () => closeModal(host)));
+  host.querySelector("#recordForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const body = Object.fromEntries(new FormData(e.target).entries());
+    const payload = {};
+    Object.entries(body).forEach(([k, v]) => { if (v !== "") payload[k] = /^\d+(\.\d+)?$/.test(v) ? Number(v) : v; });
+    const leadId = payload.leadId;
+    delete payload.leadId;
+    await api(`${config.endpoint}/${leadId}`, { method: config.method, body: JSON.stringify(payload) });
+    toast(`${config.title} saved`);
+    closeModal(host);
+    loadData();
+  };
 }
 
 function renderStats() {
@@ -532,6 +654,11 @@ function render() {
             `).join(""), ["User","Phone","Role","Status","Action"], 5, "No users found.")}
           ` : ""}
           ${state.view === "records" ? `
+            <div class="toolbar" style="margin:16px 0">
+              <button class="btn btn-primary" id="createQuote">New Quote</button>
+              <button class="btn btn-soft" id="createPayment">New Payment</button>
+              <button class="btn btn-soft" id="createGst">New GST Invoice</button>
+            </div>
             <div class="grid two">
               <div class="card"><h3 style="margin-top:0">Quotes</h3>${state.quotes.map(q => `<div class="card" style="margin-top:10px"><strong>${q.quoteNo || "Quote"}</strong><div class="muted">${q.leadName || q.customerName || "—"} • ₹${Number(q.netEffectivePrice || 0).toLocaleString("en-IN")}</div></div>`).join("") || "<div class='empty'>No quotes</div>"}</div>
               <div class="card"><h3 style="margin-top:0">Payments</h3>${state.payments.map(p => `<div class="card" style="margin-top:10px"><strong>${p.paymentNo || "Payment"}</strong><div class="muted">${p.leadName || p.customerName || "—"} • ₹${Number(p.paidAmount || 0).toLocaleString("en-IN")}</div></div>`).join("") || "<div class='empty'>No payments</div>"}</div>
@@ -558,9 +685,22 @@ function render() {
   document.querySelector("#createAction").onclick = () => {
     if (state.view === "users") return openUserModal();
     if (state.view === "leads") return openLeadModal();
+    if (state.view === "records") return openRecordModal("quote");
     toast("Use a lead card to create records");
   };
+  document.querySelector("#createQuote")?.addEventListener("click", () => openRecordModal("quote"));
+  document.querySelector("#createPayment")?.addEventListener("click", () => openRecordModal("payment"));
+  document.querySelector("#createGst")?.addEventListener("click", () => openRecordModal("gst"));
   document.querySelectorAll("[data-view]").forEach((b) => b.onclick = () => { state.view = b.dataset.view; render(); });
+  document.querySelectorAll("[data-print]").forEach((btn) => {
+    btn.onclick = () => {
+      const [kind, id] = String(btn.dataset.print || "").split(":");
+      const record = kind === "quote" ? state.quotes.find((x) => String(x._id) === id)
+        : kind === "payment" ? state.payments.find((x) => String(x._id) === id)
+        : state.gst.find((x) => String(x._id) === id);
+      if (record) printRecord(kind === "quote" ? "Quote" : kind === "payment" ? "Receipt" : "GST Invoice", record);
+    };
+  });
   document.querySelector("#newLead")?.addEventListener("click", () => openLeadModal());
   document.querySelector("#newUser")?.addEventListener("click", () => openUserModal());
   document.querySelectorAll("[data-open]").forEach((btn) => btn.addEventListener("click", () => {
