@@ -660,12 +660,12 @@ function render() {
               <button class="btn btn-soft" id="createGst">New GST Invoice</button>
             </div>
             <div class="grid two">
-              <div class="card"><h3 style="margin-top:0">Quotes</h3>${state.quotes.map(q => `<div class="card" style="margin-top:10px"><strong>${q.quoteNo || "Quote"}</strong><div class="muted">${q.leadName || q.customerName || "—"} • ₹${Number(q.netEffectivePrice || 0).toLocaleString("en-IN")}</div></div>`).join("") || "<div class='empty'>No quotes</div>"}</div>
-              <div class="card"><h3 style="margin-top:0">Payments</h3>${state.payments.map(p => `<div class="card" style="margin-top:10px"><strong>${p.paymentNo || "Payment"}</strong><div class="muted">${p.leadName || p.customerName || "—"} • ₹${Number(p.paidAmount || 0).toLocaleString("en-IN")}</div></div>`).join("") || "<div class='empty'>No payments</div>"}</div>
+              <div class="card"><h3 style="margin-top:0">Quotes</h3>${state.quotes.length ? activityCardMarkup(state.quotes, "quoteNo", "netEffectivePrice", "quote") : "<div class='empty'>No quotes</div>"}</div>
+              <div class="card"><h3 style="margin-top:0">Payments</h3>${state.payments.length ? activityCardMarkup(state.payments, "paymentNo", "paidAmount", "payment") : "<div class='empty'>No payments</div>"}</div>
             </div>
             <div class="grid two" style="margin-top:14px">
-              <div class="card"><h3 style="margin-top:0">GST Invoices</h3>${state.gst.map(g => `<div class="card" style="margin-top:10px"><strong>${g.invoiceNo || "Invoice"}</strong><div class="muted">${g.leadName || g.customerName || "—"} • ₹${Number(g.taxableAmount || 0).toLocaleString("en-IN")}</div></div>`).join("") || "<div class='empty'>No GST invoices</div>"}</div>
-              <div class="card"><h3 style="margin-top:0">Meetings</h3>${state.meetings.map(m => `<div class="card" style="margin-top:10px"><strong>${m.leadName || m.customerName || "Lead"}</strong><div class="muted">${m.meetingDate || "—"} ${m.meetingTime || ""}</div></div>`).join("") || "<div class='empty'>No meetings</div>"}</div>
+              <div class="card"><h3 style="margin-top:0">GST Invoices</h3>${state.gst.length ? activityCardMarkup(state.gst, "invoiceNo", "taxableAmount", "gst") : "<div class='empty'>No GST invoices</div>"}</div>
+              <div class="card"><h3 style="margin-top:0">Meetings</h3>${state.meetings.map(m => `<div class="card" style="margin-top:10px"><strong>${m.leadName || m.customerName || "Lead"}</strong><div class="muted">${m.meetingDate || "�"} ${m.meetingTime || ""}</div></div>`).join("") || "<div class='empty'>No meetings</div>"}</div>
             </div>
           ` : ""}
           ${state.view === "audits" ? renderTable(state.audits.map(a => `
@@ -734,3 +734,4 @@ async function logout() {
   }
   render();
 })();
+
