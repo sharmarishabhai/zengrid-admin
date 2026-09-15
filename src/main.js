@@ -1,4 +1,6 @@
-﻿const API_BASE = import.meta.env.VITE_API_BASE || "https://zengridpwa-backend.onrender.com/api";
+const RAW_API_BASE = (import.meta.env.VITE_API_BASE || "https://zengridpwa-backend.onrender.com/api").replace(/\/+$/, "");
+const API_BASE = RAW_API_BASE.endsWith("/api") ? RAW_API_BASE : `${RAW_API_BASE}/api`;
+const apiUrl = (path) => `${API_BASE}/${String(path).replace(/^\/+/, "")}`;
 const app = document.querySelector("#app");
 
 const leadStatuses = ["New Lead", "Contacted", "Interested", "Follow Up", "Not Available", "Not Picking Call", "Rescheduled", "Not Interested", "Won", "Lost"];
@@ -115,7 +117,7 @@ async function api(path, options = {}) {
   const headers = new Headers(options.headers || {});
   headers.set("Content-Type", "application/json");
   if (state.accessToken) headers.set("Authorization", `Bearer ${state.accessToken}`);
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const res = await fetch(apiUrl(path), { ...options, headers });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.message || "Request failed");
   return data;
@@ -180,7 +182,7 @@ function renderLogin() {
   app.innerHTML = `<div class="login"><div class="loginbox"><div class="brand"><div class="mark"></div><div>Zen Grid Solar<div class="sub">Admin CRM</div></div></div><h1>Login</h1><div class="grid"><div class="field"><label>Email</label><input id="email"></div><div class="field"><label>Password</label><input id="password" type="password"></div><button class="btn primary" id="loginBtn">Login</button></div></div></div>`;
   document.querySelector("#loginBtn").onclick = async () => {
     try {
-      const data = await fetch(`${API_BASE}/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: email.value.trim(), password: password.value }) }).then((r) => r.json().then((d) => r.ok ? d : Promise.reject(d)));
+      const data = await fetch(apiUrl("/auth/login"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: email.value.trim(), password: password.value }) }).then((r) => r.json().then((d) => r.ok ? d : Promise.reject(d)));
       Object.assign(state, { accessToken: data.accessToken, refreshToken: data.refreshToken, user: data.user });
       localStorage.setItem("zg_admin_access", data.accessToken);
       localStorage.setItem("zg_admin_refresh", data.refreshToken);
