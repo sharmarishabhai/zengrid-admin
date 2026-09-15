@@ -1,5 +1,4 @@
-const RAW_API_BASE = (import.meta.env.VITE_API_BASE || "https://zengridpwa-backend.onrender.com/api").replace(/\/+$/, "");
-const API_BASE = RAW_API_BASE.endsWith("/api") ? RAW_API_BASE : `${RAW_API_BASE}/api`;
+const API_BASE = "https://zengridpwa-backend.onrender.com/api";
 const apiUrl = (path) => `${API_BASE}/${String(path).replace(/^\/+/, "")}`;
 const app = document.querySelector("#app");
 
