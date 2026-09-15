@@ -40,6 +40,7 @@ const state = {
   reports: [],
   configPage: "system-sizes",
   perfMode: "tiles",
+  pages: { leads: 1, quote: 1, payment: 1, gst: 1 },
 };
 
 const css = `
@@ -71,8 +72,24 @@ const badge = (s) => s === "Won" || s === "done" || s === "active" ? "pgreen" : 
 const quoteTaxDefaults = () => active("tax-subsidy")[0] || { gstPercent: 8.9, centralSubsidy: 78000, upnedaSubsidy: 30000 };
 const isAdmin = () => state.user?.userType === "admin";
 const isLrm = () => state.user?.userType === "lrm";
-const canManageCommercialDocs = () => isAdmin();
+const canManageCommercialDocs = () => isAdmin() || state.user?.userType === "sc";
 const leadKey = (leadId) => String(leadId?._id || leadId || "");
+const pageSize = { leads: 25, quote: 10, payment: 10, gst: 10 };
+const clampPage = (page, total, size) => Math.min(Math.max(1, page), Math.max(1, Math.ceil(total / size)));
+const pageRows = (rows, name) => {
+  const size = pageSize[name] || 25;
+  const page = clampPage(state.pages[name] || 1, rows.length, size);
+  state.pages[name] = page;
+  return rows.slice((page - 1) * size, page * size);
+};
+const pager = (name, total) => {
+  const size = pageSize[name] || 25;
+  const page = clampPage(state.pages[name] || 1, total, size);
+  const pages = Math.max(1, Math.ceil(total / size));
+  const start = total ? (page - 1) * size + 1 : 0;
+  const end = Math.min(total, page * size);
+  return `<div class="toolbar" style="justify-content:space-between"><span class="muted">${start}-${end} of ${total}</span><div class="toolbar" style="margin:0"><button class="btn compact" data-page="${name}:${page - 1}" ${page <= 1 ? "disabled" : ""}>Previous</button><span class="muted">Page ${page} / ${pages}</span><button class="btn compact" data-page="${name}:${page + 1}" ${page >= pages ? "disabled" : ""}>Next</button></div></div>`;
+};
 const cleanPhone = (v) => String(v || "").replace(/\D/g, "").slice(-10);
 const docContactActions = (type, row) => {
   const label = type === "quote" ? "Quotation" : type === "payment" ? "Payment Receipt" : "GST Invoice";
@@ -122,12 +139,18 @@ async function loadData() {
   try {
     const me = await api("/auth/me");
     state.user = me.user;
-    const leadEndpoint = isAdmin() ? "/leads" : "/leads/mine";
+    const leadEndpoint = isAdmin() ? "/leads?limit=500" : "/leads/mine?limit=500";
+    const canLoadLrmResources = isAdmin() || isLrm();
     const baseCalls = [
-      api("/activities/summary"), api(leadEndpoint), api("/users/scs"), api("/config"),
+      api("/activities/summary"), api(leadEndpoint), canLoadLrmResources ? api("/users/scs") : Promise.resolve({ users: [] }), api("/config"),
     ];
-    if (canManageCommercialDocs()) baseCalls.push(api("/activities/quotes"), api("/activities/payments"), api("/activities/gst"));
-    baseCalls.push(api("/activities/meetings"), api("/followups"), api("/activities/performance"), api("/activities/daily-reports"));
+    if (canManageCommercialDocs()) baseCalls.push(api("/activities/quotes?limit=500"), api("/activities/payments?limit=500"), api("/activities/gst?limit=500"));
+    baseCalls.push(
+      api("/activities/meetings"),
+      api("/followups"),
+      canLoadLrmResources ? api("/activities/performance") : Promise.resolve({ sc: [], lrm: [] }),
+      canLoadLrmResources ? api("/activities/daily-reports") : Promise.resolve({ reports: [] })
+    );
     if (isAdmin()) baseCalls.splice(2, 0, api("/users"), api("/users/lrms"));
     const data = await Promise.all(baseCalls);
     const offset = isAdmin() ? 2 : 0;
@@ -191,8 +214,10 @@ function infoModal(title, body) {
 function renderShell(content) {
   const nav = isAdmin()
     ? [["dashboard", "Admin Dashboard"], ["leads", "Lead Management"], ["team", "Team"], ["performance-sc", "SC Performance"], ["performance-lrm", "LRM Performance"], ["configuration", "Configuration"], ["records", "Records"]]
+    : state.user?.userType === "sc"
+    ? [["dashboard", "SC Dashboard"], ["leads", "My Leads"], ["records", "Records"]]
     : [["dashboard", "LRM Dashboard"], ["leads", "My Leads"], ["performance", "My Performance"], ["report", "Day-End Report"]];
-  const accessLabel = isAdmin() ? "Admin full access" : "LRM workspace";
+  const accessLabel = isAdmin() ? "Admin full access" : state.user?.userType === "sc" ? "SC workspace" : "LRM workspace";
   app.innerHTML = `<div class="shell"><aside class="side"><div class="brand"><div class="mark"></div><div>Zen Grid Solar<div class="sub">${esc(state.user?.firstName || "User")} / ${accessLabel}</div></div></div><div class="nav">${nav.map(([id, label]) => `<button class="${state.view === id ? "active" : ""}" data-view="${id}">${label}</button>`).join("")}</div><button class="btn danger" style="margin-top:20px;width:100%" id="logout">Logout</button></aside><main class="main">${content}</main></div>`;
   document.querySelectorAll("[data-view]").forEach((b) => b.onclick = () => { state.view = b.dataset.view; render(); });
   document.querySelector("#logout").onclick = () => { localStorage.clear(); Object.assign(state, { accessToken: "", user: null }); renderLogin(); };
@@ -314,12 +339,12 @@ function leadDetailModal(id) {
   });
 }
 
-function leadRows() {
+function leadRows(rows = state.leads) {
   const docButtons = (id) => canManageCommercialDocs() ? `
         <button class="btn icon-btn primary" title="Quote" aria-label="Quote" data-quote="${id}">${icon("quote")}</button>
         <button class="btn icon-btn green" title="Receipt" aria-label="Receipt" data-pay="${id}">${icon("payment")}</button>
-        <button class="btn icon-btn" title="GST" aria-label="GST" data-gst="${id}">${icon("gst")}</button>` : "";
-  return state.leads.map((l) => `
+        ${isAdmin() ? `<button class="btn icon-btn" title="GST" aria-label="GST" data-gst="${id}">${icon("gst")}</button>` : ""}` : "";
+  return rows.map((l) => `
     <div class="lead-row" data-lead-open="${l._id}" role="button" tabindex="0">
       <div class="lead-head">
         <div class="avatar">${esc((l.customerName || "?").slice(0, 1).toUpperCase())}</div>
@@ -359,6 +384,7 @@ function leadsView() {
   const follow = state.leads.filter((l) => l.leadStatus === "Follow Up").length;
   const meetings = state.leads.filter((l) => l.meetingDate).length;
   const unassigned = state.leads.filter((l) => !l.assignedToUserId).length;
+  const visibleLeads = pageRows(state.leads, "leads");
   return `${top("Lead Management", "Create, assign, update status, schedule follow-ups and generate records.", `<button class="btn primary" id="addLead">Add Lead</button>`)}
   <div class="lead-filters">
     <div class="mini-stat"><span class="k">Won</span><b>${won}</b></div>
@@ -366,7 +392,9 @@ function leadsView() {
     <div class="mini-stat"><span class="k">Meetings</span><b>${meetings}</b></div>
     <div class="mini-stat"><span class="k">Unassigned SC</span><b>${unassigned}</b></div>
   </div>
-  <div class="lead-board">${leadRows() || `<div class="empty">No leads found</div>`}</div>`;
+  ${pager("leads", state.leads.length)}
+  <div class="lead-board">${leadRows(visibleLeads) || `<div class="empty">No leads found</div>`}</div>
+  ${pager("leads", state.leads.length)}`;
 }
 
 function leadForm(lead = {}) {
@@ -489,7 +517,8 @@ function recordsView() {
 
 function documentCards(rows, type) {
   if (!rows.length) return `<div class="empty">No records found</div>`;
-  return `<div class="doc-board">${rows.map((r, index) => {
+  const visibleRows = pageRows(rows, type);
+  return `${pager(type, rows.length)}<div class="doc-board">${visibleRows.map((r, index) => {
     const lead = state.leads.find((l) => leadKey(l._id) === leadKey(r.leadId));
     r = { ...r, email: r.email || lead?.email || "", whatsappNumber: r.whatsappNumber || lead?.whatsappNumber || "", phone: r.phone || lead?.phone || "" };
     const no = r.quoteNo || r.paymentNo || r.invoiceNo;
@@ -501,7 +530,7 @@ function documentCards(rows, type) {
         ? [["Lead", r.leadName], ["Mode", r.paymentMode || "-"], ["Balance Due", rupee(r.remainingAmount)], ["Date", fmtDocDate(date)]]
         : [["Lead", r.leadName], ["Taxable", rupee(r.taxableAmount)], ["Tax", rupee(Number(r.cgst || 0) + Number(r.sgst || 0) + Number(r.igst || 0))], ["Date", fmtDocDate(date)]];
     return `<div class="doc-card ${index === 0 ? "latest" : ""}"><div class="doc-head"><div class="doc-title"><div class="doc-icon">${type === "quote" ? "Q" : type === "payment" ? "R" : "G"}</div><div><div class="doc-no">${esc(no)}</div><div class="muted">${index === 0 ? "Latest record" : "Previous record"}</div></div></div><span class="pill ${type === "payment" ? "pgreen" : type === "gst" ? "pblue" : "porange"}">${esc(type.toUpperCase())}</span></div><div class="doc-amount">${rupee(amount)}</div><div class="doc-grid">${fields.map(([label, value]) => `<div class="doc-field"><label>${label}</label><span>${esc(value)}</span></div>`).join("")}</div>${docContactActions(type, r)}</div>`;
-  }).join("")}</div>`;
+  }).join("")}</div>${pager(type, rows.length)}`;
 }
 
 function bindDocumentButtons() {
@@ -652,6 +681,12 @@ function viewGstPdf(g) {
 
 function bind() {
   document.querySelector("#refresh")?.addEventListener("click", loadData);
+  document.querySelectorAll("[data-page]").forEach((b) => b.onclick = () => {
+    const [name, rawPage] = b.dataset.page.split(":");
+    const rows = name === "leads" ? state.leads : name === "quote" ? state.quotes : name === "payment" ? state.payments : state.gst;
+    state.pages[name] = clampPage(Number(rawPage), rows.length, pageSize[name] || 25);
+    render();
+  });
   document.querySelectorAll("[data-perf-mode]").forEach((b) => b.onclick = () => { state.perfMode = b.dataset.perfMode; render(); });
   document.querySelector("#addLead")?.addEventListener("click", () => modal("Add Lead", leadForm(), (data) => api("/leads", { method: "POST", body: JSON.stringify(data) })));
   document.querySelectorAll("[data-lead-open]").forEach((row) => {
@@ -694,6 +729,7 @@ function bind() {
 function render() {
   if (!state.accessToken || !state.user) return renderLogin();
   if (isLrm() && ["team", "configuration", "records"].includes(state.view)) state.view = "dashboard";
+  if (state.user?.userType === "sc" && ["team", "configuration", "performance", "performance-sc", "performance-lrm", "report"].includes(state.view)) state.view = "dashboard";
   if (!isAdmin() && ["performance-sc", "performance-lrm"].includes(state.view)) state.view = "performance";
   const views = {
     dashboard: dashboardView,
