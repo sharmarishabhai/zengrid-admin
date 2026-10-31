@@ -1,4 +1,6 @@
-const API_BASE = "https://zengridpwa-backend.onrender.com/api";
+import { renderQuoteDocument } from "../../quote-template.js";
+
+const API_BASE = "http://localhost:9191/api";
 const apiUrl = (path) => `${API_BASE}/${String(path).replace(/^\/+/, "")}`;
 const app = document.querySelector("#app");
 
@@ -42,6 +44,7 @@ const state = {
   configPage: "system-sizes",
   perfMode: "tiles",
   pages: { leads: 1, quote: 1, payment: 1, gst: 1 },
+  leadFilters: { q: "", leadStatus: "", source: "", assignedToUserId: "", assignedByUserId: "", meeting: "", meetingDateFrom: "", meetingDateTo: "", followUpDateFrom: "", followUpDateTo: "" },
 };
 
 const css = `
@@ -65,6 +68,8 @@ table{width:100%;border-collapse:collapse}th,td{padding:12px;border-bottom:1px s
 .doc-preview-modal{width:min(1120px,calc(100vw - 24px));height:min(92vh,980px);padding:14px}.doc-preview-frame{width:100%;height:calc(92vh - 76px);border:1px solid var(--line);border-radius:10px;background:#fff}.doc-actions{display:flex;gap:7px;justify-content:flex-end;flex-wrap:wrap}@media(max-width:1180px){.lead-row{grid-template-columns:1fr 1fr}.actions-row{justify-content:flex-start}.stats{grid-template-columns:repeat(3,1fr)}}@media(max-width:900px){.shell{grid-template-columns:1fr}.side{height:auto;position:static}.main{padding:18px}.lead-filters{grid-template-columns:repeat(2,1fr)}.two,.three{grid-template-columns:1fr}}@media(max-width:600px){.stats,.lead-filters{grid-template-columns:1fr}.lead-row{grid-template-columns:1fr}.top{display:block}.main{padding:12px}}
 `;
 document.head.insertAdjacentHTML("beforeend", `<style>${css}</style>`);
+document.head.insertAdjacentHTML("beforeend", `<style>.card .lead-filters{grid-template-columns:minmax(220px,2fr) repeat(4,minmax(125px,1fr));gap:8px;align-items:end;margin-bottom:0}.card .lead-filters .field{gap:3px}.card .lead-filters .field label{font-size:9px;letter-spacing:.04em}.card .lead-filters .field input,.card .lead-filters .field select{padding:8px 9px;border-radius:8px;font-size:12px}.card .lead-filters+.toolbar{margin-top:8px}.lead-board{max-height:calc(100vh - 390px);overflow-y:auto;padding:2px 7px 2px 2px;scrollbar-width:thin;scrollbar-color:#c9b8dc transparent}.lead-board::-webkit-scrollbar{width:8px}.lead-board::-webkit-scrollbar-thumb{background:#c9b8dc;border-radius:8px}@media(max-width:900px){.card .lead-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.lead-board{max-height:calc(100vh - 470px)}}@media(max-width:600px){.card .lead-filters{grid-template-columns:1fr}.lead-board{max-height:none;overflow:visible}}</style>`);
+document.head.insertAdjacentHTML("beforeend", `<style>.legacy-quote-form{border:0;background:#fff;padding:0}.quote-customer{background:#eef3ea;border:1.5px solid #a8b79a;border-radius:8px;padding:11px 14px;margin-bottom:18px;font-size:13px;color:#58674e}.quote-customer span{margin-left:14px}.legacy-quote-form .field input,.legacy-quote-form .field select,.legacy-quote-form .field textarea{border-color:#d8d2df;background:#fff;padding:10px 11px;border-radius:8px}.legacy-quote-form .field label{font-size:10px;letter-spacing:.04em}.legacy-quote-form .field textarea{min-height:58px}</style>`);
 
 const rupee = (n) => `Rs ${Number(n || 0).toLocaleString("en-IN")}`;
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
@@ -381,11 +386,20 @@ ${docButtons(l._id)}
 }
 
 function leadsView() {
-  const won = state.leads.filter((l) => l.leadStatus === "Won").length;
-  const follow = state.leads.filter((l) => l.leadStatus === "Follow Up").length;
-  const meetings = state.leads.filter((l) => l.meetingDate).length;
-  const unassigned = state.leads.filter((l) => !l.assignedToUserId).length;
-  const visibleLeads = pageRows(state.leads, "leads");
+  const f = state.leadFilters;
+  const filtered = state.leads.filter((l) => {
+    const q = f.q.toLowerCase();
+    const hay = [l.customerName, l.leadId, l.phone, l.whatsappNumber, l.email, l.area, l.locality].join(" ").toLowerCase();
+    const meetingDate = l.meetingDate || ""; const followDate = l.followUpDate || "";
+    return (!q || hay.includes(q)) && (!f.leadStatus || l.leadStatus === f.leadStatus) && (!f.source || l.source === f.source) && (!f.assignedToUserId || String(l.assignedToUserId || "") === f.assignedToUserId) && (!f.assignedByUserId || String(l.assignedByUserId || "") === f.assignedByUserId) && (!f.meeting || (f.meeting === "scheduled" ? !!l.meetingDate && l.meetingStatus !== "done" : l.meetingStatus === "done")) && (!f.meetingDateFrom || meetingDate >= f.meetingDateFrom) && (!f.meetingDateTo || meetingDate <= f.meetingDateTo) && (!f.followUpDateFrom || followDate >= f.followUpDateFrom) && (!f.followUpDateTo || followDate <= f.followUpDateTo);
+  });
+  const won = filtered.filter((l) => l.leadStatus === "Won").length;
+  const follow = filtered.filter((l) => l.leadStatus === "Follow Up").length;
+  const meetings = filtered.filter((l) => l.meetingDate).length;
+  const unassigned = filtered.filter((l) => !l.assignedToUserId).length;
+  const visibleLeads = pageRows(filtered, "leads");
+  const select = (name, value, options, label) => `<div class="field"><label>${label}</label><select data-lead-filter="${name}"><option value="">All ${label}</option>${options.map((x) => `<option value="${esc(x.value || x)}" ${String(value) === String(x.value || x) ? "selected" : ""}>${esc(x.label || x)}</option>`).join("")}</select></div>`;
+  const activeFilters = Object.values(f).some(Boolean);
   return `${top("Lead Management", "Create, assign, update status, schedule follow-ups and generate records.", `<button class="btn primary" id="addLead">Add Lead</button>`)}
   <div class="lead-filters">
     <div class="mini-stat"><span class="k">Won</span><b>${won}</b></div>
@@ -393,9 +407,10 @@ function leadsView() {
     <div class="mini-stat"><span class="k">Meetings</span><b>${meetings}</b></div>
     <div class="mini-stat"><span class="k">Unassigned SC</span><b>${unassigned}</b></div>
   </div>
-  ${pager("leads", state.leads.length)}
+  <div class="card"><div class="lead-filters" style="margin:0"><div class="field"><label>Search leads</label><input data-lead-filter="q" value="${esc(f.q)}" placeholder="Name, phone, ID, email, area..."></div>${select("leadStatus", f.leadStatus, leadStatuses, "Status")}${select("source", f.source, ["Website","Social Media","Field Visit","Import"], "Source")}${select("assignedToUserId", f.assignedToUserId, state.scs.map((u) => ({ value:u._id, label:`${u.firstName} ${u.lastName}` })), "Consultant")}${select("assignedByUserId", f.assignedByUserId, state.lrms.map((u) => ({ value:u._id, label:`${u.firstName} ${u.lastName}` })), "LRM") }<div class="field"><label>Meeting</label><select data-lead-filter="meeting"><option value="">All meetings</option><option value="scheduled" ${f.meeting === "scheduled" ? "selected" : ""}>Scheduled</option><option value="done" ${f.meeting === "done" ? "selected" : ""}>Meeting Done</option></select></div><div class="field"><label>Meeting date from</label><input type="date" data-lead-filter="meetingDateFrom" value="${f.meetingDateFrom}"></div><div class="field"><label>Meeting date to</label><input type="date" data-lead-filter="meetingDateTo" value="${f.meetingDateTo}"></div><div class="field"><label>Follow-up from</label><input type="date" data-lead-filter="followUpDateFrom" value="${f.followUpDateFrom}"></div><div class="field"><label>Follow-up to</label><input type="date" data-lead-filter="followUpDateTo" value="${f.followUpDateTo}"></div></div><div class="toolbar" style="margin-bottom:0"><span class="muted">${filtered.length} matching leads</span>${activeFilters ? `<button class="btn compact" id="clearLeadFilters">Clear filters</button>` : ""}</div></div>
+  ${pager("leads", filtered.length)}
   <div class="lead-board">${leadRows(visibleLeads) || `<div class="empty">No leads found</div>`}</div>
-  ${pager("leads", state.leads.length)}`;
+  ${pager("leads", filtered.length)}`;
 }
 
 function leadForm(lead = {}) {
@@ -559,7 +574,7 @@ function openNewQuote(id) {
   const lead = state.leads.find((l) => l._id === id);
   const options = (type) => active(type).map((x) => `<option value="${x._id}" data-price="${x.systemPrice || 0}">${esc(x.name)}</option>`).join("");
   const tax = quoteTaxDefaults();
-  modal("Generate Quotation", `<div class="quote-paper"><div class="quote-head"><div><b>Zen Grid Solar LLP</b><br>${esc(lead?.customerName)} / ${esc(lead?.phone)}</div><div>Quotation</div></div><div class="grid two"><div class="field"><label>System Size</label><select name="systemSizeConfigId" id="systemPick" required>${options("system-size")}</select></div><div class="field"><label>Base Price</label><input type="number" name="price" id="qPrice"></div><div class="field"><label>Solar Panel</label><select name="panelConfigId">${options("solar-panel")}</select></div><div class="field"><label>Inverter</label><select name="inverterConfigId">${options("inverter")}</select></div><div class="field"><label>Floor</label><select name="floor">${floors.map((x) => `<option>${x}</option>`)}</select></div><div class="field"><label>Structure</label><select name="structureConfigId">${options("structure-type")}</select></div><div class="field"><label>Wiring</label><select name="wiringConfigId">${options("wiring")}</select></div><div class="field"><label>Cleaning</label><select name="cleaning"><option>Yes</option><option>No</option></select></div><div class="field"><label>Overhead Price</label><input type="number" name="overheadPrice" value="0"></div><div class="field"><label>Extra Discount</label><input type="number" name="extraDiscount" value="0"></div><div class="field"><label>GST %</label><input type="number" name="gstPercent" value="${tax.gstPercent || 0}"></div><div class="field"><label>Central Subsidy</label><input type="number" name="subsidy1" value="${tax.centralSubsidy || 0}"></div><div class="field"><label>UPNEDA Subsidy</label><input type="number" name="subsidy2" value="${tax.upnedaSubsidy || 0}"></div><div class="field"><label>Send Later</label><select><option>Email and WhatsApp UI ready</option></select></div><div class="field" style="grid-column:1/-1"><label>Notes</label><textarea name="note"></textarea></div></div></div>`, async (data) => { const res = await api(`/activities/quotes/${id}`, { method: "POST", body: JSON.stringify(data) }); viewQuotePdf(res.quote); });
+  modal("📄 Quotation Generate Karo", `<div class="quote-paper legacy-quote-form"><div class="quote-customer">⚡ Customer: <strong>${esc(lead?.customerName || "—")}</strong><span>📞 ${esc(lead?.phone || "—")}</span><span>📍 ${esc(lead?.area || "—")}</span></div><div class="grid two"><div class="field"><label>System Size (kW)</label><select name="systemSizeConfigId" id="systemPick" required>${options("system-size")}</select></div><div class="field"><label>Solar Panel</label><select name="panelConfigId">${options("solar-panel")}</select></div><div class="field"><label>Inverter</label><select name="inverterConfigId">${options("inverter")}</select></div><div class="field"><label>Structure Type</label><select name="structureConfigId">${options("structure-type")}</select></div><div class="field"><label>Floor / Height</label><select name="floor">${floors.map((x) => `<option>${x}</option>`)}</select></div><div class="field"><label>Wiring</label><select name="wiringConfigId">${options("wiring")}</select></div><div class="field"><label>Cleaning Frequency</label><select name="cleaning"><option>Yes</option><option>No</option></select></div><div class="field"><label>System Price (₹)</label><input type="number" name="price" id="qPrice"></div><div class="field"><label>Early Bird Discount (₹)</label><input type="number" name="discount1" value="10000"></div><div class="field"><label>Extra Discount (₹)</label><input type="number" name="discount2" value="0"></div><div class="field"><label>GST %</label><input type="number" name="gstPercent" value="${tax.gstPercent || 0}"></div><div class="field"><label>Govt Subsidy (₹)</label><input type="number" name="subsidy1" value="${tax.centralSubsidy || 0}"></div><div class="field"><label>UPNEDA Subsidy (₹)</label><input type="number" name="subsidy2" value="${tax.upnedaSubsidy || 0}"></div><div class="field"><label>Overhead Price (₹)</label><input type="number" name="overheadPrice" value="0"></div><div class="field" style="grid-column:1/-1"><label>Note (optional)</label><textarea name="note" placeholder="Koi special note..."></textarea></div></div></div>`, async (data) => { const res = await api(`/activities/quotes/${id}`, { method: "POST", body: JSON.stringify(data) }); viewQuotePdf(res.quote); });
   const pick = document.querySelector("#systemPick"), price = document.querySelector("#qPrice");
   const setPrice = () => { price.value = pick.selectedOptions[0]?.dataset.price || 0; };
   pick.onchange = setPrice; setPrice();
@@ -631,22 +646,31 @@ function numberWords(num) {
 }
 
 function zengridLogoMarkup(size = 34) {
+  if (size === 55) return `<img src="/quote-assets/gst-logo.jpeg" alt="Zengrid Solar" style="width:55px;height:55px;object-fit:cover;border-radius:8px;display:block">`;
   const bolt = Math.max(10, Math.round(size * 0.55));
   const stroke = Math.max(1.4, Math.round(size * 0.08) / 10);
   return `<div style="width:${size}px;height:${size}px;background:#0b0d14;border-radius:${Math.max(10, Math.round(size * 0.28))}px;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 22px rgba(11,13,20,.18);"><svg viewBox="0 0 24 24" width="${bolt}" height="${bolt}" fill="none" stroke="#f5cb32" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg></div>`;
 }
 
 function openDocument(html, width = 980, height = 1100) {
+  html = html.replace('<div class="sign-line">Authorized Signatory</div>', '<div style="width:220px;margin:0 0 0 auto;text-align:center"><img src="/quote-assets/signature.jpeg" alt="Zen Grid Solar stamp" style="width:92px;height:92px;object-fit:contain;display:block;margin:0 auto -12px"><div class="sign-line" style="border-top:1.5px solid #0A0F1A;padding-top:.4rem;text-align:center">Authorized Signatory</div></div>');
   const host = document.createElement("div");
   host.className = "modalback doc-preview-back";
   host.innerHTML = `<div class="modal doc-preview-modal"><div class="modalhead"><h2>Document Preview</h2><button type="button" class="icon-close" data-close aria-label="Close">x</button></div><iframe class="doc-preview-frame" title="Document Preview"></iframe></div>`;
   document.body.append(host);
   host.querySelectorAll("[data-close]").forEach((b) => b.onclick = () => host.remove());
   const frame = host.querySelector("iframe");
-  frame.srcdoc = html;
+  frame.srcdoc = html
+    .replace("Commercial <span>Offer</span>", "Our offer <span>for you</span>")
+    .replace("Solar Rooftop System Price", "Rooftop System")
+    .replace('>Discount</td>', '>Early Bird Discount</td>')
+    .replace('>Net Price</td>', `>Net Price (Inclusive of ${html.match(/GST @ ([^<]+)%/)?.[1] || "8.9"}% GST)</td>`)
+    .replace('>Net Effective Price</td>', '>⚡ Net Effective Price*</td>');
 }
 
 function viewQuotePdf(q) {
+  openDocument(renderQuoteDocument(q, { esc, rupee, fmtDocDate, logo: zengridLogoMarkup }));
+  return;
   const price = Number(q.price || 0);
   const discounts = Number(q.discount1 || 0) + Number(q.discount2 || 0) + Number(q.extraDiscount || 0);
   const netPrice = Number(q.netPrice || price - discounts);
@@ -689,6 +713,10 @@ function bind() {
     render();
   });
   document.querySelectorAll("[data-perf-mode]").forEach((b) => b.onclick = () => { state.perfMode = b.dataset.perfMode; render(); });
+  document.querySelectorAll("[data-lead-filter]").forEach((el) => {
+    el.addEventListener("change", () => { state.leadFilters[el.dataset.leadFilter] = el.value; state.pages.leads = 1; render(); });
+  });
+  document.querySelector("#clearLeadFilters")?.addEventListener("click", () => { Object.keys(state.leadFilters).forEach((k) => { state.leadFilters[k] = ""; }); state.pages.leads = 1; render(); });
   document.querySelector("#addLead")?.addEventListener("click", () => modal("Add Lead", leadForm(), (data) => api("/leads", { method: "POST", body: JSON.stringify(data) })));
   document.querySelectorAll("[data-lead-open]").forEach((row) => {
     const open = () => leadDetailModal(row.dataset.leadOpen);
