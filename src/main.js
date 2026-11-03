@@ -1,4 +1,4 @@
-import { renderQuoteDocument } from "../../quote-template.js";
+import { renderQuoteDocument } from "./quote-template.js";
 
 const API_BASE = "http://localhost:9191/api";
 const apiUrl = (path) => `${API_BASE}/${String(path).replace(/^\/+/, "")}`;
