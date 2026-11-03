@@ -66,13 +66,21 @@ table{width:100%;border-collapse:collapse}th,td{padding:12px;border-bottom:1px s
 .doc-board{display:grid;gap:12px}.doc-card{position:relative;overflow:hidden;background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;box-shadow:0 10px 24px rgba(76,17,143,.06)}.doc-card:before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:#a8b79a}.doc-card.latest{border-color:#a8b79a;box-shadow:inset 5px 0 0 #a8b79a,0 12px 26px rgba(76,17,143,.08)}.doc-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.doc-title{display:flex;gap:11px;align-items:flex-start;min-width:0}.doc-icon{width:40px;height:40px;border-radius:10px;background:#f1eafb;color:#4c118f;display:grid;place-items:center;font-weight:950;flex:0 0 40px}.doc-no{font-size:14px;font-weight:950;color:#241a30;overflow-wrap:anywhere}.doc-amount{font-size:22px;font-weight:950;color:#4c118f;margin-top:10px}.doc-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}.doc-field{background:#f7f5f1;border:1px solid var(--line);border-radius:9px;padding:9px;min-width:0}.doc-field label{display:block;font-size:10px;font-weight:900;text-transform:uppercase;color:var(--muted);margin-bottom:3px}.doc-field span{display:block;font-size:12px;font-weight:900;overflow-wrap:anywhere}.doc-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
 .modalback{position:fixed;inset:0;background:rgba(30,18,53,.68);display:grid;place-items:center;padding:16px;z-index:50}.modal{width:min(980px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:14px;padding:18px;box-shadow:0 26px 64px rgba(30,18,53,.18);border:1px solid rgba(168,183,154,.35)}.modalhead{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:14px}.modalhead h2{margin:0;font-size:20px}.icon-close{width:34px;min-width:34px;height:34px;padding:0;border-radius:999px;background:#f7f5f1;border-color:#ded6ea;color:var(--brand)}.quote-paper{background:#fff;border:2px solid var(--brand);padding:18px;border-radius:14px}.quote-head{display:flex;justify-content:space-between;border-bottom:4px solid var(--solar);padding-bottom:12px;margin-bottom:12px}.quote-total{font-size:28px;font-weight:900;color:var(--green)}.empty{padding:28px;text-align:center;color:var(--muted);background:#faf9f5;border:1px dashed #a8b79a;border-radius:10px}
 .bars{display:grid;gap:8px}.bar{height:28px;background:#f0eef7;border-radius:6px;overflow:hidden}.bar span{display:block;height:100%;background:linear-gradient(90deg,var(--brand),#8fa57f)}.subnav{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}.subnav button{border:1px solid var(--line);background:#fff;padding:10px 12px;border-radius:10px;font-weight:800}.subnav button.active{background:var(--brand);border-color:var(--brand);color:#fff}
-.doc-preview-modal{width:min(1120px,calc(100vw - 24px));height:min(92vh,980px);padding:14px}.doc-preview-frame{width:100%;height:calc(92vh - 76px);border:1px solid var(--line);border-radius:10px;background:#fff}.doc-actions{display:flex;gap:7px;justify-content:flex-end;flex-wrap:wrap}@media(max-width:1180px){.lead-row{grid-template-columns:1fr 1fr}.actions-row{justify-content:flex-start}.stats{grid-template-columns:repeat(3,1fr)}}@media(max-width:900px){.shell{grid-template-columns:1fr}.side{height:auto;position:static}.main{padding:18px}.lead-filters{grid-template-columns:repeat(2,1fr)}.two,.three{grid-template-columns:1fr}}@media(max-width:600px){.stats,.lead-filters{grid-template-columns:1fr}.lead-row{grid-template-columns:1fr}.top{display:block}.main{padding:12px}}
+.doc-preview-modal{width:min(1120px,calc(100vw - 24px));height:min(92vh,980px);padding:14px}.doc-preview-frame{width:100%;height:calc(92vh - 76px);border:1px solid var(--line);border-radius:10px;background:#fff}.doc-actions{display:flex;gap:7px;justify-content:flex-end;flex-wrap:wrap}.loading-overlay{position:fixed;inset:0;z-index:200;background:rgba(255,255,255,.62);backdrop-filter:blur(2px);display:grid;place-items:center}.loading-card{display:flex;align-items:center;gap:11px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 18px;box-shadow:0 18px 50px rgba(76,17,143,.2);color:#4c118f;font-weight:900}.loading-spinner{width:22px;height:22px;border:3px solid #e8def5;border-top-color:#4c118f;border-radius:50%;animation:zgspin .75s linear infinite}@keyframes zgspin{to{transform:rotate(360deg)}}@media(max-width:1180px){.lead-row{grid-template-columns:1fr 1fr}.actions-row{justify-content:flex-start}.stats{grid-template-columns:repeat(3,1fr)}}@media(max-width:900px){.shell{grid-template-columns:1fr}.side{height:auto;position:static}.main{padding:18px}.lead-filters{grid-template-columns:repeat(2,1fr)}.two,.three{grid-template-columns:1fr}}@media(max-width:600px){.stats,.lead-filters{grid-template-columns:1fr}.lead-row{grid-template-columns:1fr}.top{display:block}.main{padding:12px}}
 `;
 document.head.insertAdjacentHTML("beforeend", `<style>${css}</style>`);
 document.head.insertAdjacentHTML("beforeend", `<style>.card .lead-filters{grid-template-columns:minmax(220px,2fr) repeat(4,minmax(125px,1fr));gap:8px;align-items:end;margin-bottom:0}.card .lead-filters .field{gap:3px}.card .lead-filters .field label{font-size:9px;letter-spacing:.04em}.card .lead-filters .field input,.card .lead-filters .field select{padding:8px 9px;border-radius:8px;font-size:12px}.card .lead-filters+.toolbar{margin-top:8px}.lead-board{max-height:calc(100vh - 390px);overflow-y:auto;padding:2px 7px 2px 2px;scrollbar-width:thin;scrollbar-color:#c9b8dc transparent}.lead-board::-webkit-scrollbar{width:8px}.lead-board::-webkit-scrollbar-thumb{background:#c9b8dc;border-radius:8px}@media(max-width:900px){.card .lead-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.lead-board{max-height:calc(100vh - 470px)}}@media(max-width:600px){.card .lead-filters{grid-template-columns:1fr}.lead-board{max-height:none;overflow:visible}}</style>`);
 document.head.insertAdjacentHTML("beforeend", `<style>.legacy-quote-form{border:0;background:#fff;padding:0}.quote-customer{background:#eef3ea;border:1.5px solid #a8b79a;border-radius:8px;padding:11px 14px;margin-bottom:18px;font-size:13px;color:#58674e}.quote-customer span{margin-left:14px}.legacy-quote-form .field input,.legacy-quote-form .field select,.legacy-quote-form .field textarea{border-color:#d8d2df;background:#fff;padding:10px 11px;border-radius:8px}.legacy-quote-form .field label{font-size:10px;letter-spacing:.04em}.legacy-quote-form .field textarea{min-height:58px}</style>`);
 
 const rupee = (n) => `Rs ${Number(n || 0).toLocaleString("en-IN")}`;
+let pendingRequests = 0;
+function setLoading(active) {
+  pendingRequests += active ? 1 : -1;
+  pendingRequests = Math.max(0, pendingRequests);
+  let overlay = document.querySelector("#loadingOverlay");
+  if (pendingRequests > 0 && !overlay) { overlay = document.createElement("div"); overlay.id = "loadingOverlay"; overlay.className = "loading-overlay"; overlay.innerHTML = `<div class="loading-card"><span class="loading-spinner"></span><span>Loading…</span></div>`; document.body.append(overlay); }
+  if (pendingRequests === 0) overlay?.remove();
+}
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
 const active = (type) => state.configs.filter((x) => x.type === type && x.status === "active");
 const badge = (s) => s === "Won" || s === "done" || s === "active" ? "pgreen" : s === "Lost" || s === "Not Interested" ? "pred" : s === "Interested" ? "ppurple" : s === "Follow Up" || s === "Rescheduled" ? "porange" : "pblue";
@@ -119,13 +127,18 @@ const icon = (name) => ({
 })[name] || "";
 
 async function api(path, options = {}) {
+  setLoading(true);
   const headers = new Headers(options.headers || {});
   headers.set("Content-Type", "application/json");
   if (state.accessToken) headers.set("Authorization", `Bearer ${state.accessToken}`);
-  const res = await fetch(apiUrl(path), { ...options, headers });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.message || "Request failed");
-  return data;
+  try {
+    const res = await fetch(apiUrl(path), { ...options, headers });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || "Request failed");
+    return data;
+  } finally {
+    setLoading(false);
+  }
 }
 
 function toast(message) {
@@ -188,6 +201,7 @@ async function loadData() {
 function renderLogin() {
   app.innerHTML = `<div class="login"><div class="loginbox"><div class="brand"><div class="mark"></div><div>Zen Grid Solar<div class="sub">Admin CRM</div></div></div><h1>Login</h1><div class="grid"><div class="field"><label>Email</label><input id="email"></div><div class="field"><label>Password</label><input id="password" type="password"></div><button class="btn primary" id="loginBtn">Login</button></div></div></div>`;
   document.querySelector("#loginBtn").onclick = async () => {
+    setLoading(true);
     try {
       const data = await fetch(apiUrl("/auth/login"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: email.value.trim(), password: password.value }) }).then((r) => r.json().then((d) => r.ok ? d : Promise.reject(d)));
       Object.assign(state, { accessToken: data.accessToken, refreshToken: data.refreshToken, user: data.user });
@@ -195,7 +209,7 @@ function renderLogin() {
       localStorage.setItem("zg_admin_refresh", data.refreshToken);
       localStorage.setItem("zg_admin_user", JSON.stringify(data.user));
       loadData();
-    } catch (e) { toast(e.message || "Login failed"); }
+    } catch (e) { toast(e.message || "Login failed"); } finally { setLoading(false); }
   };
 }
 
