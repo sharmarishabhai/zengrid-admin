@@ -41,6 +41,7 @@ const state = {
   followUps: [],
   performance: { sc: [], lrm: [] },
   reports: [],
+  plants: [],
   configPage: "system-sizes",
   perfMode: "tiles",
   pages: { leads: 1, quote: 1, payment: 1, gst: 1 },
@@ -157,6 +158,7 @@ async function loadData() {
       canLoadLrmResources ? api("/activities/performance") : Promise.resolve({ sc: [], lrm: [] }),
       canLoadLrmResources ? api("/activities/daily-reports") : Promise.resolve({ reports: [] })
     );
+    baseCalls.push(api("/plants"));
     if (isAdmin()) baseCalls.splice(2, 0, api("/users"), api("/users/lrms"));
     const data = await Promise.all(baseCalls);
     const offset = isAdmin() ? 2 : 0;
@@ -174,6 +176,7 @@ async function loadData() {
       followUps: data[(canManageCommercialDocs() ? 8 : 5) + offset].followUps || [],
       performance: data[(canManageCommercialDocs() ? 9 : 6) + offset] || { sc: [], lrm: [] },
       reports: data[(canManageCommercialDocs() ? 10 : 7) + offset].reports || [],
+      plants: data[data.length - 1].plants || [],
     });
     localStorage.setItem("zg_admin_user", JSON.stringify(state.user));
   } catch (e) {
@@ -219,7 +222,7 @@ function infoModal(title, body) {
 
 function renderShell(content) {
   const nav = isAdmin()
-    ? [["dashboard", "Admin Dashboard"], ["leads", "Lead Management"], ["team", "Team"], ["performance-sc", "SC Performance"], ["performance-lrm", "LRM Performance"], ["configuration", "Configuration"], ["records", "Records"]]
+    ? [["dashboard", "Admin Dashboard"], ["leads", "Lead Management"], ["plants", "Plant Locations"], ["team", "Team"], ["performance-sc", "SC Performance"], ["performance-lrm", "LRM Performance"], ["configuration", "Configuration"], ["records", "Records"]]
     : state.user?.userType === "sc"
     ? [["dashboard", "SC Dashboard"], ["leads", "My Leads"], ["records", "Records"]]
     : [["dashboard", "LRM Dashboard"], ["leads", "My Leads"], ["performance", "My Performance"], ["report", "Day-End Report"]];
@@ -442,6 +445,15 @@ function configView() {
   return `${top("Configuration", "Each configuration master has its own page, fields and backend schema.", `<button class="btn primary" id="addConfig">Add ${page.label}</button>`)}
   <div class="subnav">${Object.entries(configPages).map(([key, cfg]) => `<button class="${state.configPage === key ? "active" : ""}" data-config-page="${key}">${cfg.label}</button>`).join("")}</div>
   <div class="card" style="overflow:auto"><h3>${page.label}</h3>${configTable(state.configPage, rows)}</div>`;
+}
+
+function plantsView() {
+  return `${top("Plant Locations", "Manage installed customer plants and their map coordinates.", `<button class="btn primary" id="addPlant">Add Plant</button>`)}<div class="card" style="overflow:auto"><table><thead><tr><th>Customer</th><th>Phone</th><th>Coordinates</th><th>Location</th><th>Action</th></tr></thead><tbody>${state.plants.map((p) => { const l = p.leadId || {}; return `<tr><td><b>${esc(l.customerName || "-")}</b></td><td>${esc(l.phone || "-")}</td><td>${Number(p.latitude).toFixed(6)}, ${Number(p.longitude).toFixed(6)}</td><td>${esc(p.locationLabel || "-")}</td><td><button class="btn" data-edit-plant="${p._id}">Edit</button> <button class="btn danger" data-delete-plant="${p._id}">Delete</button></td></tr>`; }).join("") || `<tr><td colspan="5"><div class="empty">No plant locations yet.</div></td></tr>`}</tbody></table></div>`;
+}
+
+function plantForm(plant = {}) {
+  const selected = plant.leadId?._id || plant.leadId || "";
+  return `<div class="grid"><div class="field"><label>Customer</label><select name="leadId" required ${selected ? "disabled" : ""}><option value="">Select customer</option>${state.leads.map((l) => `<option value="${l._id}" ${String(selected) === String(l._id) ? "selected" : ""}>${esc(l.customerName)} - ${esc(l.phone)}</option>`).join("")}</select>${selected ? `<input type="hidden" name="leadId" value="${selected}">` : ""}</div><div class="grid two"><div class="field"><label>Latitude</label><input name="latitude" type="number" step="any" required value="${esc(plant.latitude)}"></div><div class="field"><label>Longitude</label><input name="longitude" type="number" step="any" required value="${esc(plant.longitude)}"></div></div><div class="field"><label>Location label</label><input name="locationLabel" value="${esc(plant.locationLabel)}" placeholder="Rooftop plant"></div></div>`;
 }
 
 function configTable(pageKey, rows) {
@@ -751,6 +763,9 @@ function bind() {
     modal(`Edit ${configPages[pageKey].label}`, configForm(pageKey, c), (data) => api(`/config/${pageKey}/${c._id}`, { method: "PATCH", body: JSON.stringify(data) }));
   });
   document.querySelector("#addReport")?.addEventListener("click", () => modal("Day-End Report", reportForm(), (data) => api("/activities/daily-reports", { method: "POST", body: JSON.stringify(data) })));
+  document.querySelector("#addPlant")?.addEventListener("click", () => modal("Add Plant Location", plantForm(), (data) => api("/plants", { method: "POST", body: JSON.stringify(data) })));
+  document.querySelectorAll("[data-edit-plant]").forEach((b) => b.onclick = () => { const p = state.plants.find((x) => x._id === b.dataset.editPlant); modal("Edit Plant Location", plantForm(p), (data) => api("/plants", { method: "POST", body: JSON.stringify(data) })); });
+  document.querySelectorAll("[data-delete-plant]").forEach((b) => b.onclick = async () => { if (!confirm("Delete this plant location?")) return; try { await api(`/plants/${b.dataset.deletePlant}`, { method: "DELETE" }); await loadData(); } catch (e) { toast(e.message); } });
   bindDocumentButtons();
   bindSendButtons();
 }
@@ -763,6 +778,7 @@ function render() {
   const views = {
     dashboard: dashboardView,
     leads: leadsView,
+    plants: plantsView,
     team: teamView,
     configuration: configView,
     performance: performanceView,
