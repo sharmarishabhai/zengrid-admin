@@ -507,6 +507,13 @@ function performanceShell() {
   return `<div class="grid two"><div class="card"><h3>SC Performance</h3>${scView}</div><div class="card"><h3>LRM Performance</h3>${lrmView}</div></div>`;
 }
 
+function lrmPerformanceShell() {
+  const rows = state.performance.lrm || [];
+  const row = rows.find((x) => String(x.userId || "") === String(state.user?._id || "")) || rows[0];
+  if (!row) return `<div class="card"><div class="empty">No performance data yet. Add a day-end report to start tracking your performance.</div></div>`;
+  return `<div class="card"><div class="lead-top"><div><h3>${esc(row.name || `${state.user?.firstName || ""} ${state.user?.lastName || ""}`.trim() || "My Performance")}</h3><div class="muted">Your assigned leads and submitted day-end reports</div></div><span class="pill pblue">${row.conversionPercentage || 0}% conversion</span></div><div class="status-strip" style="margin-top:14px">${[["Total Calls", row.totalCalls], ["Connected", row.connectedCalls], ["Meetings Scheduled", row.meetingsScheduled], ["Meetings Done", row.meetingsDone], ["Orders Closed", row.ordersClosed]].map(([label, value]) => `<div class="status-tile"><b>${value || 0}</b><span>${label}</span></div>`).join("")}</div></div>`;
+}
+
 function scPerformanceView() {
   const rows = state.performance.sc || [];
   const mode = state.perfMode || "tiles";
