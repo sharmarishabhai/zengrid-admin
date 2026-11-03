@@ -1,6 +1,6 @@
 import { renderQuoteDocument } from "./quote-template.js";
 
-const API_BASE = "http://localhost:9191/api";
+const API_BASE = "https://zengridpwa-backend.onrender.com/api";
 const apiUrl = (path) => `${API_BASE}/${String(path).replace(/^\/+/, "")}`;
 const app = document.querySelector("#app");
 
