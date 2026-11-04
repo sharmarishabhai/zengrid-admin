@@ -160,7 +160,7 @@ async function loadData() {
   try {
     const me = await api("/auth/me");
     state.user = me.user;
-    const leadEndpoint = isAdmin() ? "/leads?limit=500" : "/leads/mine?limit=500";
+    const leadEndpoint = isAdmin() ? "/leads?limit=1000" : "/leads/mine?limit=1000";
     const canLoadLrmResources = isAdmin() || isLrm();
     const baseCalls = [
       api("/activities/summary"), api(leadEndpoint), canLoadLrmResources ? api("/users/scs") : Promise.resolve({ users: [] }), api("/config"),
