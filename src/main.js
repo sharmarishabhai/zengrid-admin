@@ -173,7 +173,9 @@ async function loadData() {
       canLoadLrmResources ? api("/activities/performance") : Promise.resolve({ sc: [], lrm: [] }),
       canLoadLrmResources ? api("/activities/daily-reports") : Promise.resolve({ reports: [] })
     );
-    baseCalls.push(api("/plants"));
+    // Plant locations are only available to admins and SCs. Do not let the
+    // forbidden LRM request reject Promise.all and blank the whole account.
+    if (isAdmin() || state.user?.userType === "sc") baseCalls.push(api("/plants"));
     if (isAdmin()) baseCalls.splice(2, 0, api("/users"), api("/users/lrms"));
     const data = await Promise.all(baseCalls);
     const offset = isAdmin() ? 2 : 0;
@@ -191,7 +193,7 @@ async function loadData() {
       followUps: data[(canManageCommercialDocs() ? 8 : 5) + offset].followUps || [],
       performance: data[(canManageCommercialDocs() ? 9 : 6) + offset] || { sc: [], lrm: [] },
       reports: data[(canManageCommercialDocs() ? 10 : 7) + offset].reports || [],
-      plants: data[data.length - 1].plants || [],
+      plants: isAdmin() || state.user?.userType === "sc" ? data[data.length - 1].plants || [] : [],
     });
     localStorage.setItem("zg_admin_user", JSON.stringify(state.user));
   } catch (e) {
