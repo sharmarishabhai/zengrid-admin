@@ -221,6 +221,20 @@ function modal(title, body, onSave, wide = true) {
   host.innerHTML = `<form class="modal" style="${wide ? "" : "width:min(520px,100%)"}"><div class="modalhead"><h2>${title}</h2><button type="button" class="btn icon-btn icon-close" aria-label="Close" data-close>${icon("close")}</button></div>${body}<div class="toolbar" style="justify-content:flex-end"><button type="button" class="btn" data-close>Cancel</button><button class="btn primary">Save</button></div></form>`;
   document.body.append(host);
   host.querySelectorAll("[data-close]").forEach((b) => b.onclick = () => host.remove());
+  const customerSearch = host.querySelector("[data-plant-customer-search]");
+  const customerSelect = host.querySelector("[data-plant-customer-select]");
+  const customerCount = host.querySelector("[data-plant-customer-count]");
+  customerSearch?.addEventListener("input", () => {
+    const term = customerSearch.value.trim().toLowerCase();
+    let visible = 0;
+    customerSelect?.querySelectorAll("option[data-customer-search]").forEach((option) => {
+      const match = !term || option.dataset.customerSearch.includes(term);
+      option.hidden = !match;
+      if (match) visible += 1;
+    });
+    if (customerCount) customerCount.textContent = `${visible} customer${visible === 1 ? "" : "s"} found`;
+    if (customerSelect && customerSelect.value && customerSelect.selectedOptions[0]?.hidden) customerSelect.value = "";
+  });
   host.querySelector("form").onsubmit = async (e) => {
     e.preventDefault();
     try { await onSave(Object.fromEntries(new FormData(e.target).entries()), host); host.remove(); await loadData(); } catch (err) { toast(err.message); }
@@ -438,7 +452,13 @@ function leadsView() {
 
 function leadForm(lead = {}) {
   const showAssignedBy = isAdmin();
-  const assigneeFields = `<div class="field"><label>Assigned By (LRM)</label>${showAssignedBy ? `<select name="assignedByUserId" required><option value="">Select LRM</option>${state.lrms.map((u) => `<option value="${u._id}" ${String(lead.assignedByUserId || "") === String(u._id) ? "selected" : ""}>${esc(u.firstName)} ${esc(u.lastName)}</option>`).join("")}</select>` : `<input value="${esc(`${state.user?.firstName || ""} ${state.user?.lastName || ""}`.trim())}" disabled>`}</div><div class="field"><label>Assigned To (SC optional)</label><select name="assignedToUserId"><option value="">No SC yet</option>${state.scs.map((u) => `<option value="${u._id}" ${String(lead.assignedToUserId || "") === String(u._id) ? "selected" : ""}>${esc(u.firstName)} ${esc(u.lastName)}</option>`).join("")}</select></div>`;
+  // Keep the dropdown driven by the canonical SC list, but fall back to the
+  // loaded team list if the dedicated /users/scs response was unavailable.
+  const scUsers = (state.scs.length ? state.scs : state.users.filter((u) => u.userType === "sc"));
+  const legacyAssignedName = String(lead.assignedTo || "").trim().toLowerCase();
+  const selectedSc = lead.assignedToUserId || scUsers.find((u) => `${u.firstName} ${u.lastName}`.trim().toLowerCase() === legacyAssignedName)?._id || "";
+  const scOptions = scUsers.map((u) => `<option value="${u._id}" ${String(selectedSc) === String(u._id) ? "selected" : ""}>${esc(`${u.firstName} ${u.lastName}`.trim())}</option>`).join("");
+  const assigneeFields = `<div class="field"><label>Assigned By (LRM)</label>${showAssignedBy ? `<select name="assignedByUserId" required><option value="">Select LRM</option>${state.lrms.map((u) => `<option value="${u._id}" ${String(lead.assignedByUserId || "") === String(u._id) ? "selected" : ""}>${esc(u.firstName)} ${esc(u.lastName)}</option>`).join("")}</select>` : `<input value="${esc(`${state.user?.firstName || ""} ${state.user?.lastName || ""}`.trim())}" disabled>`}</div><div class="field"><label>Assigned To (SC optional)</label><select name="assignedToUserId"><option value="">No SC yet</option>${scOptions}</select>${!scUsers.length ? `<small class="muted">No SC users are currently available. Add or activate an SC from Team Management.</small>` : ""}</div>`;
   return `<div class="grid two">
     <div class="field"><label>Name</label><input name="customerName" required value="${esc(lead.customerName)}"></div><div class="field"><label>Phone</label><input name="phone" required value="${esc(lead.phone)}"></div>
     <div class="field"><label>WhatsApp Number</label><input name="whatsappNumber" value="${esc(lead.whatsappNumber)}"></div><div class="field"><label>Email</label><input type="email" name="email" value="${esc(lead.email)}"></div>
@@ -473,7 +493,8 @@ function plantsView() {
 
 function plantForm(plant = {}) {
   const selected = plant.leadId?._id || plant.leadId || "";
-  return `<div class="grid"><div class="field"><label>Customer</label><select name="leadId" required ${selected ? "disabled" : ""}><option value="">Select customer</option>${state.leads.map((l) => `<option value="${l._id}" ${String(selected) === String(l._id) ? "selected" : ""}>${esc(l.customerName)} - ${esc(l.phone)}</option>`).join("")}</select>${selected ? `<input type="hidden" name="leadId" value="${selected}">` : ""}</div><div class="grid two"><div class="field"><label>Latitude</label><input name="latitude" type="number" step="any" required value="${esc(plant.latitude)}"></div><div class="field"><label>Longitude</label><input name="longitude" type="number" step="any" required value="${esc(plant.longitude)}"></div></div><div class="field"><label>Location label</label><input name="locationLabel" value="${esc(plant.locationLabel)}" placeholder="Rooftop plant"></div></div>`;
+  const options = state.leads.map((l) => `<option value="${l._id}" data-customer-search="${esc(`${l.customerName || ""} ${l.phone || ""} ${l.email || ""}`.toLowerCase())}" ${String(selected) === String(l._id) ? "selected" : ""}>${esc(l.customerName)} - ${esc(l.phone)}${l.email ? ` - ${esc(l.email)}` : ""}</option>`).join("");
+  return `<div class="grid"><div class="field"><label>Search customer by name, phone or email</label><input type="search" data-plant-customer-search placeholder="Type customer name, phone or email..." autocomplete="off"><select name="leadId" data-plant-customer-select required ${selected ? "disabled" : ""}><option value="">Select customer</option>${options}</select>${selected ? `<input type="hidden" name="leadId" value="${selected}">` : ""}<small class="muted" data-plant-customer-count>${state.leads.length} customers available</small></div><div class="grid two"><div class="field"><label>Latitude</label><input name="latitude" type="number" step="any" required value="${esc(plant.latitude)}"></div><div class="field"><label>Longitude</label><input name="longitude" type="number" step="any" required value="${esc(plant.longitude)}"></div></div><div class="field"><label>Location label</label><input name="locationLabel" value="${esc(plant.locationLabel)}" placeholder="Rooftop plant"></div></div>`;
 }
 
 function configTable(pageKey, rows) {
