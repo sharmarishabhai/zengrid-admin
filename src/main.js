@@ -722,9 +722,14 @@ function openDocument(html, width = 980, height = 1100) {
   html = html.replace('<div class="sign-line">Authorized Signatory</div>', '<div style="width:220px;margin:0 0 0 auto;text-align:center"><img src="/quote-assets/signature.jpeg" alt="Zen Grid Solar stamp" style="width:92px;height:92px;object-fit:contain;display:block;margin:0 auto -12px"><div class="sign-line" style="border-top:1.5px solid #0A0F1A;padding-top:.4rem;text-align:center">Authorized Signatory</div></div>');
   html = html.replace(/Inclusive of [^%]+% GST/g, "Inclusive of 8.9% GST");
   if (html.includes("<title>GST Invoice")) {
+    const taxRows = html.match(/<tr><td>(?:CGST|SGST|IGST)<\/td><td>(.*?)<\/td><\/tr>/g) || [];
+    const displayedGst = taxRows.reduce((sum, row) => {
+      const amount = row.match(/<td>(?:Rs|₹)\s*([\d,.-]+)/)?.[1] || "0";
+      return sum + (Number(amount.replace(/,/g, "")) || 0);
+    }, 0);
     html = html.replace(/9954/g, "85414011")
       .replace("* CGST & SGST applicable as per GST Act.", "* GST applicable as per GST Act.")
-      .replace(/<tr><td>CGST<\/td><td>.*?<\/td><\/tr><tr><td>SGST<\/td><td>.*?<\/td><\/tr><tr><td>IGST<\/td><td>.*?<\/td><\/tr>/, `<tr><td>GST @ 8.9%</td><td>${rupee(gstAmount)}</td></tr>`);
+      .replace(/<tr><td>CGST<\/td><td>.*?<\/td><\/tr><tr><td>SGST<\/td><td>.*?<\/td><\/tr><tr><td>IGST<\/td><td>.*?<\/td><\/tr>/, `<tr><td>GST @ 8.9%</td><td>${rupee(displayedGst)}</td></tr>`);
   }
   const host = document.createElement("div");
   host.className = "modalback doc-preview-back";
