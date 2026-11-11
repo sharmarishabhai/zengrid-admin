@@ -729,7 +729,7 @@ function numberWords(num) {
   const lakh = Math.floor(n / 100000);
   const thousand = Math.floor((n % 100000) / 1000);
   const remainder = n % 1000;
-  return [[lakh ? `${words(lakh)} Lakh` : "", thousand ? `${words(thousand)} Thousand` : "", words(remainder)]
+  return [lakh ? `${words(lakh)} Lakh` : "", thousand ? `${words(thousand)} Thousand` : "", words(remainder)]
     .filter(Boolean).join(" ");
 }
 
