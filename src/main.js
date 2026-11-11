@@ -647,14 +647,25 @@ function openNewPayment(id) {
 }
 
 function openNewGst(id) {
-  modal("GST Invoice", `<div class="grid two"><div class="field"><label>Customer GSTIN</label><input name="customerGSTIN"></div><div class="field"><label>PAN</label><input name="customerPAN"></div><div class="field"><label>Taxable Amount</label><input type="number" name="taxableAmount" id="gstTaxableAmount" min="0" step="0.01"></div><div class="field"><label>GST @ 8.9%</label><input type="number" name="cgst" id="gstAmount" readonly style="background:#f7f5f1"></div><div class="field" style="grid-column:1/-1"><label>Address</label><textarea name="address"></textarea></div></div>`, async (data) => { const res = await api(`/activities/gst/${id}`, { method: "POST", body: JSON.stringify(data) }); viewGstPdf(res.invoice); });
+  modal("GST Invoice", `<div class="grid two"><div class="field"><label>Customer GSTIN</label><input name="customerGSTIN"></div><div class="field"><label>PAN</label><input name="customerPAN"></div><div class="field"><label>Final Invoice Amount (GST inclusive)</label><input type="number" name="finalAmount" id="gstFinalAmount" min="0" step="0.01"></div><div class="field"><label>Taxable Amount (before GST)</label><input type="number" id="gstTaxableAmount" readonly style="background:#f7f5f1"></div><div class="field"><label>GST @ 8.9%</label><input type="number" name="cgst" id="gstAmount" readonly style="background:#f7f5f1"></div><div class="field" style="grid-column:1/-1"><label>Address</label><textarea name="address"></textarea></div></div>`, async (data) => {
+    const finalAmount = Math.max(0, Number(data.finalAmount) || 0);
+    const gstAmount = Math.round((finalAmount * 8.9) / 108.9);
+    data.taxableAmount = finalAmount - gstAmount;
+    data.cgst = gstAmount;
+    delete data.finalAmount;
+    const res = await api(`/activities/gst/${id}`, { method: "POST", body: JSON.stringify(data) });
+    viewGstPdf(res.invoice);
+  });
   const taxable = document.querySelector("#gstTaxableAmount");
+  const finalAmount = document.querySelector("#gstFinalAmount");
   const gstAmount = document.querySelector("#gstAmount");
   const calculateGst = () => {
-    const taxableAmount = Math.max(0, Number(taxable.value) || 0);
-    gstAmount.value = Math.round((taxableAmount * 8.9) / 108.9);
+    const final = Math.max(0, Number(finalAmount.value) || 0);
+    const tax = Math.round((final * 8.9) / 108.9);
+    gstAmount.value = tax;
+    taxable.value = final - tax;
   };
-  taxable.addEventListener("input", calculateGst);
+  finalAmount.addEventListener("input", calculateGst);
 }
 
 function leadDocs(id, type) {
