@@ -726,9 +726,11 @@ function numberWords(num) {
   };
   const n = Math.round(Number(num || 0));
   if (!n) return "Zero";
-  if (n < 1000) return words(n);
-  if (n < 100000) return `${words(Math.floor(n / 1000))} Thousand ${words(n % 1000)}`.trim();
-  return [words(Math.floor(n / 100000)), "Lakh", words(n % 100000)].filter(Boolean).join(" ");
+  const lakh = Math.floor(n / 100000);
+  const thousand = Math.floor((n % 100000) / 1000);
+  const remainder = n % 1000;
+  return [[lakh ? `${words(lakh)} Lakh` : "", thousand ? `${words(thousand)} Thousand` : "", words(remainder)]
+    .filter(Boolean).join(" ");
 }
 
 function zengridLogoMarkup(size = 34) {
