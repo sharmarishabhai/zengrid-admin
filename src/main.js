@@ -738,6 +738,11 @@ function zengridLogoMarkup(size = 34) {
 }
 
 function openDocument(html, width = 980, height = 1100) {
+  const discountRows = html.match(/<tr><td class="disc">(?:Early Bird Discount|Discount)<\/td><td class="disc">-\s*(?:Rs|₹)\s*[\d,.-]+<\/td><\/tr>/g) || [];
+  if (discountRows.length > 1) {
+    const discount = discountRows.reduce((sum, row) => sum + (Number(row.match(/(?:Rs|₹)\s*([\d,.-]+)/)?.[1]?.replace(/,/g, "")) || 0), 0);
+    html = html.replace(discountRows.join(""), `<tr><td class="disc">Discount</td><td class="disc">- ${rupee(discount)}</td></tr>`);
+  }
   html = html.replace('<div class="sign-line">Authorized Signatory</div>', '<div style="width:220px;margin:0 0 0 auto;text-align:center"><img src="/quote-assets/signature.jpeg" alt="Zen Grid Solar stamp" style="width:92px;height:92px;object-fit:contain;display:block;margin:0 auto -12px"><div class="sign-line" style="border-top:1.5px solid #0A0F1A;padding-top:.4rem;text-align:center">Authorized Signatory</div></div>');
   html = html.replace(/Inclusive of [^%]+% GST/g, "Inclusive of 8.9% GST");
   if (html.includes("<title>GST Invoice")) {
@@ -759,7 +764,6 @@ function openDocument(html, width = 980, height = 1100) {
   frame.srcdoc = html
     .replace("Commercial <span>Offer</span>", "Our offer <span>for you</span>")
     .replace("Solar Rooftop System Price", "Rooftop System")
-    .replace('>Discount</td>', '>Early Bird Discount</td>')
     .replace('>Net Price</td>', '>Net Price (Inclusive of 8.9% GST)</td>')
     .replace('>Net Effective Price</td>', '>⚡ Net Effective Price*</td>');
 }
