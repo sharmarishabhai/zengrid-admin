@@ -197,6 +197,11 @@ async function loadData() {
     });
     localStorage.setItem("zg_admin_user", JSON.stringify(state.user));
   } catch (e) {
+    if (/session expired|invalid token|not authorized/i.test(e.message || "")) {
+      localStorage.removeItem("zg_admin_access"); localStorage.removeItem("zg_admin_refresh"); localStorage.removeItem("zg_admin_user");
+      Object.assign(state, { accessToken: "", refreshToken: "", user: null });
+      return renderLogin();
+    }
     toast(e.message);
   }
   render();
