@@ -135,7 +135,22 @@ async function api(path, options = {}) {
   headers.set("Content-Type", "application/json");
   if (state.accessToken) headers.set("Authorization", `Bearer ${state.accessToken}`);
   try {
-    const res = await fetch(apiUrl(path), { ...options, headers });
+    let res = await fetch(apiUrl(path), { ...options, headers });
+    if (res.status === 401 && state.refreshToken && path !== "/auth/refresh") {
+      const refreshRes = await fetch(apiUrl("/auth/refresh"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refreshToken: state.refreshToken }) });
+      const refreshData = await refreshRes.json().catch(() => ({}));
+      if (refreshRes.ok && refreshData.accessToken) {
+        state.accessToken = refreshData.accessToken;
+        localStorage.setItem("zg_admin_access", state.accessToken);
+        headers.set("Authorization", `Bearer ${state.accessToken}`);
+        res = await fetch(apiUrl(path), { ...options, headers });
+      } else {
+        localStorage.removeItem("zg_admin_access"); localStorage.removeItem("zg_admin_refresh"); localStorage.removeItem("zg_admin_user");
+        Object.assign(state, { accessToken: "", refreshToken: "", user: null });
+        renderLogin();
+        throw new Error("Session expired. Please log in again.");
+      }
+    }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.message || "Request failed");
     return data;
