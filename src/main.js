@@ -76,6 +76,7 @@ document.head.insertAdjacentHTML("beforeend", `<style>.legacy-quote-form{border:
 
 const rupee = (n) => `Rs ${Number(n || 0).toLocaleString("en-IN")}`;
 let pendingRequests = 0;
+let loadSequence = 0;
 function setLoading(active) {
   pendingRequests += active ? 1 : -1;
   pendingRequests = Math.max(0, pendingRequests);
@@ -158,6 +159,7 @@ function toast(message) {
 
 async function loadData() {
   if (!state.accessToken) return renderLogin();
+  const requestId = ++loadSequence;
   try {
     const me = await api("/auth/me");
     state.user = me.user;
@@ -178,6 +180,7 @@ async function loadData() {
     if (isAdmin() || state.user?.userType === "sc") baseCalls.push(api("/plants"));
     if (isAdmin()) baseCalls.splice(2, 0, api("/users"), api("/users/lrms"));
     const data = await Promise.all(baseCalls);
+    if (requestId !== loadSequence) return;
     const offset = isAdmin() ? 2 : 0;
     Object.assign(state, {
       summary: data[0].summary || {},
@@ -197,6 +200,7 @@ async function loadData() {
     });
     localStorage.setItem("zg_admin_user", JSON.stringify(state.user));
   } catch (e) {
+    if (requestId !== loadSequence) return;
     if (/session expired|invalid token|not authorized/i.test(e.message || "")) {
       localStorage.removeItem("zg_admin_access"); localStorage.removeItem("zg_admin_refresh"); localStorage.removeItem("zg_admin_user");
       Object.assign(state, { accessToken: "", refreshToken: "", user: null });
