@@ -773,7 +773,11 @@ function openDocument(html, width = 980, height = 1100) {
 }
 
 function viewQuotePdf(q) {
-  openDocument(renderQuoteDocument(q, { esc, rupee, fmtDocDate, logo: zengridLogoMarkup }));
+  const inverterWarranty = /havells/i.test(String(q.inverter || "")) ? "10 Year Warranty" : "8 Year Warranty";
+  const quoteHtml = renderQuoteDocument(q, { esc, rupee, fmtDocDate, logo: zengridLogoMarkup })
+    .replace("10 / 7 Year Warranty", inverterWarranty)
+    .replace("</tbody></table></div><div class=\"page content components\">", "<tr><td><b>Structure Guarantee</b></td><td>25 Years</td><td>Zen Grid Solar</td><td>—</td></tr></tbody></table></div><div class=\"page content components\">");
+  openDocument(quoteHtml);
   return;
   const price = Number(q.price || 0);
   const discounts = Number(q.discount1 || 0) + Number(q.discount2 || 0) + Number(q.extraDiscount || 0);
