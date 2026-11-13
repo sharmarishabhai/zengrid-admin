@@ -790,8 +790,8 @@ function openDocument(html, width = 980, height = 1100) {
 function viewQuotePdf(q) {
   const inverterWarranty = /havells/i.test(String(q.inverter || "")) ? "10 Year Warranty" : "8 Year Warranty";
   const quoteHtml = renderQuoteDocument(q, { esc, rupee, fmtDocDate, logo: zengridLogoMarkup })
-    .replace("10 / 7 Year Warranty", inverterWarranty)
-    .replace("</tbody></table></div><div class=\"page content components\">", "<tr><td><b>Structure Guarantee</b></td><td>25 Years</td><td>Zen Grid Solar</td><td>—</td></tr></tbody></table></div><div class=\"page content components\">");
+    .replace(/10\s*\/\s*7 Year Warranty/g, inverterWarranty)
+    .replace(/(<tr><td>Solar Panel Mounting Structure<\/td>.*?<\/tr>)/, "$1<tr><td><b>Structure Guarantee</b></td><td>25 Years</td><td>Zen Grid Solar</td><td>—</td></tr>");
   openDocument(quoteHtml);
   return;
   const price = Number(q.price || 0);
