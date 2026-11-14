@@ -315,7 +315,7 @@ function renderShell(content) {
     : state.user?.userType === "sc"
     ? [["dashboard", "SC Dashboard"], ["leads", "My Leads"], ["records", "Records"]]
     : state.user?.userType === "lrm_tl"
-    ? [["dashboard", "Dashboard"], ["leads", "Team Leads"], ["all-leads", "All Leads"], ["performance", "Team Performance"], ["report", "Reports"]]
+    ? [["dashboard", "LRM TL Dashboard"], ["leads", "Team Leads"], ["performance", "Team Performance"], ["report", "Reports"]]
     : [["dashboard", "LRM Dashboard"], ["leads", "My Leads"], ["performance", "My Performance"], ["report", "Day-End Report"]];
   const accessLabel = isAdmin() ? "Admin full access" : state.user?.userType === "sc" ? "SC workspace" : state.user?.userType === "lrm_tl" ? "LRM Team Lead workspace" : "LRM workspace";
   app.innerHTML = `<div class="shell"><aside class="side"><div class="brand"><div class="mark"></div><div>Zen Grid Solar<div class="sub">${esc(state.user?.firstName || "User")} / ${accessLabel}</div></div></div><div class="nav">${nav.map(([id, label]) => `<button class="${state.view === id ? "active" : ""}" data-view="${id}">${label}</button>`).join("")}</div><button class="btn danger" style="margin-top:20px;width:100%" id="logout">Logout</button></aside><main class="main">${content}</main></div>`;
@@ -367,12 +367,9 @@ function lrmDashboardView() {
   const conversion = connected ? Math.round(((s.won || 0) / connected) * 100) : 0;
   const recent = state.leads.slice(0, 5);
   const teamLead = state.user?.userType === "lrm_tl";
-  const teamMembers = teamLead ? state.lrms.filter((u) => u.userType === "lrm").length : 0;
-  const closed = state.leads.filter((l) => l.leadStatus === "Won").length;
-  const conversion = state.leads.length ? Math.round((closed / state.leads.length) * 100) : 0;
-  return `${top("Dashboard", teamLead ? "Team lead overview for all leads and team members." : "Your leads, calls, scheduled meetings and closures.")}
+  return `${top(teamLead ? "LRM Team Lead Dashboard" : "LRM Dashboard", teamLead ? "Manage your team’s leads, quality and assignments." : "Your leads, calls, scheduled meetings and closures.")}
   <div class="stats">
-    ${[[teamLead ? "Total Leads" : "My Leads", state.leads.length], ...(teamLead ? [["Team Members", teamMembers], ["Assigned Leads", state.leads.filter((l) => l.assignedByUserId || l.lrmAssignedToUserId).length]] : [["Assigned", state.leads.filter((l) => l.assignedToUserId).length]]), ["Closed Leads", teamLead ? closed : s.won], ["Conversion", `${teamLead ? conversion : (connected ? Math.round(((s.won || 0) / connected) * 100) : 0)}%`]].map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v || 0}</div></div>`).join("")}
+    ${[[teamLead ? "Team Leads" : "My Leads", state.leads.length], [teamLead ? "Assigned to LRMs" : "Assigned", state.leads.filter((l) => l.lrmAssignedToUserId && String(l.lrmAssignedToUserId) !== String(state.user?._id)).length], ["Connected Calls", connected], ["Total Calls", calls], ["Closed", s.won], ["Conversion", `${conversion}%`]].map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v || 0}</div></div>`).join("")}
   </div>
   <div class="grid two" style="margin-top:14px">
     <div class="card"><h3>Recent Leads</h3>${recent.map((l) => `<div class="card" style="margin-top:8px"><b>${esc(l.customerName)}</b><div class="muted">${esc(l.phone)} / ${esc(l.area)} / ${esc(l.leadStatus)}</div></div>`).join("") || `<div class="empty">No recent leads</div>`}</div>
@@ -489,7 +486,7 @@ function leadRows(rows = state.leads) {
 }
 
 function leadsView() {
-  if (state.user?.userType === "lrm_tl" && state.view !== "all-leads") return lrmTeamLeadLeadsView();
+  if (state.user?.userType === "lrm_tl") return lrmTeamLeadLeadsView();
   const f = state.leadFilters;
   const filtered = state.leads.filter((l) => {
     const q = f.q.toLowerCase();
@@ -976,7 +973,6 @@ function render() {
   const views = {
     dashboard: dashboardView,
     leads: leadsView,
-    "all-leads": leadsView,
     plants: plantsView,
     team: teamView,
     configuration: configView,
