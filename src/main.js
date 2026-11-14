@@ -200,7 +200,10 @@ async function loadData() {
     // forbidden LRM request reject Promise.all and blank the whole account.
     if (isAdmin() || state.user?.userType === "sc") baseCalls.push(api("/plants"));
     if (isAdmin()) baseCalls.splice(2, 0, api("/users"), api("/users/lrms"));
-    const data = await Promise.all(baseCalls);
+    const settled = await Promise.allSettled(baseCalls);
+    const failed = settled.filter((result) => result.status === "rejected");
+    const data = settled.map((result) => result.status === "fulfilled" ? result.value : {});
+    if (failed.length) toast(`${failed.length} dashboard service${failed.length > 1 ? "s" : ""} unavailable; other data loaded`);
     if (requestId !== loadSequence) return;
     const offset = isAdmin() ? 2 : 0;
     Object.assign(state, {
