@@ -186,7 +186,7 @@ async function loadData() {
     const me = await api("/auth/me");
     state.user = me.user;
     const leadFilter = state.user?.userType === "lrm_tl" ? (state.lrmLeadFilter || {}) : {};
-    const leadParams = new URLSearchParams({ limit: "5000" });
+    const leadParams = new URLSearchParams({ limit: "25", page: String(state.lrmLeadPage || 1) });
     if (leadFilter.assignment) leadParams.set("assignment", leadFilter.assignment);
     if (leadFilter.status) leadParams.set("lrmStatus", leadFilter.status);
     if (leadFilter.lrmId) leadParams.set("lrmAssignedToUserId", leadFilter.lrmId);
@@ -241,6 +241,22 @@ async function loadData() {
     toast(e.message);
   }
   render();
+}
+
+async function loadLrmLeadData() {
+  if (!state.accessToken) return renderLogin();
+  const filter = state.lrmLeadFilter || {};
+  const params = new URLSearchParams({ limit: "25", page: String(state.lrmLeadPage || 1) });
+  if (filter.assignment) params.set("assignment", filter.assignment);
+  if (filter.status) params.set("lrmStatus", filter.status);
+  if (filter.lrmId) params.set("lrmAssignedToUserId", filter.lrmId);
+  if (filter.q) params.set("q", filter.q);
+  try {
+    const data = await api(`/leads/mine?${params.toString()}`);
+    state.leads = data.leads || [];
+    state.lrmLeadPagination = data.pagination || {};
+    render();
+  } catch (e) { toast(e.message); }
 }
 
 function renderLogin() {
@@ -507,7 +523,8 @@ function lrmTeamLeadLeadsView() {
   const counts = Object.fromEntries(statuses.map((s) => [s, rows.filter((l) => (l.lrmStatus || "New Lead") === s).length]));
   const cards = rows.map((l) => `<div class="card" style="padding:13px;display:flex;gap:12px;align-items:flex-start"><input type="checkbox" data-lrm-select="${l._id}" ${selected.has(l._id) ? "checked" : ""} style="margin-top:5px;width:18px;height:18px"><div style="flex:1"><div style="display:flex;justify-content:space-between;gap:10px"><div><b>${esc(l.customerName || "-")}</b><div class="muted">${esc(l.leadId || "-")} · ${esc(l.source || "-")} · ${esc(l.createdAt ? new Date(l.createdAt).toLocaleString() : "-")}</div></div><span class="pill ${badge(l.lrmStatus || "New Lead")}">${esc(l.lrmStatus || "New Lead")}</span></div><div class="muted" style="margin-top:7px">${esc(l.phone)}${l.email ? ` · ${esc(l.email)}` : ""} · ${esc(l.area || l.locality || "")}</div><div class="toolbar" style="margin:9px 0 0"><a class="btn compact" href="tel:${esc(l.phone)}">Call</a><a class="btn compact green" href="https://wa.me/${esc(String(l.whatsappNumber || l.phone).replace(/\D/g, ""))}" target="_blank" rel="noreferrer">WhatsApp</a><span class="muted">LRM: ${esc(state.lrms.find((u) => String(u._id) === String(l.lrmAssignedToUserId)) ? `${state.lrms.find((u) => String(u._id) === String(l.lrmAssignedToUserId)).firstName} ${state.lrms.find((u) => String(u._id) === String(l.lrmAssignedToUserId)).lastName}` : "Unassigned")}</span></div></div></div>`).join("");
   const tab = (label, assignment = "", status = "") => `<button type="button" class="btn ${filter.assignment === assignment && filter.status === status && !filter.lrmId ? "primary" : ""}" data-lrm-tab="${assignment}" data-lrm-tab-status="${status}">${label}</button>`;
-  return `${top("LRM Lead Management", "Assign unassigned leads to LRMs and monitor your team’s lead quality.", `<button type="button" class="btn primary" id="assignSelectedLrm" ${selected.size ? "" : "disabled"}>Assign ${selected.size || ""} selected</button>`)}<div class="toolbar"><b>Lead views</b>${tab("New Leads", "unassigned")}${statuses.map((s) => `<button type="button" class="btn ${filter.status === s ? "primary" : ""}" data-lrm-tab-status="${s}">${s} (${counts[s]})</button>`).join("")}<select id="lrmLeadOwner"><option value="">Leads by LRM</option>${state.lrms.filter((u) => u.userType === "lrm").map((u) => `<option value="${u._id}" ${String(filter.lrmId) === String(u._id) ? "selected" : ""}>${esc(u.firstName)} ${esc(u.lastName)}</option>`).join("")}</select>${tab("Assigned Leads", "assigned")}${tab("All Leads")}</div><div class="card"><div class="field"><label>Search leads</label><input id="lrmLeadSearch" value="${esc(filter.q)}" placeholder="Name, phone, lead ID..."></div></div><div class="toolbar"><b>${rows.length}</b><span class="muted">leads · ${selected.size} selected</span></div><div class="lead-board">${cards || `<div class="empty">No leads found in this category.</div>`}</div>`;
+  const page = Number(state.lrmLeadPagination?.page || 1); const pages = Number(state.lrmLeadPagination?.pages || 1);
+  return `${top("LRM Lead Management", "Assign unassigned leads to LRMs and monitor your team’s lead quality.", `<button type="button" class="btn primary" id="assignSelectedLrm" ${selected.size ? "" : "disabled"}>Assign ${selected.size || ""} selected</button>`)}<div class="toolbar"><b>Lead views</b>${tab("New Leads (unassigned)", "unassigned")}${statuses.map((s) => `<button type="button" class="btn ${filter.status === s ? "primary" : ""}" data-lrm-tab-status="${s}">${s === "New Lead" ? "New Lead (quality)" : s}</button>`).join("")}<select id="lrmLeadOwner"><option value="">Leads by LRM</option>${state.lrms.filter((u) => u.userType === "lrm").map((u) => `<option value="${u._id}" ${String(filter.lrmId) === String(u._id) ? "selected" : ""}>${esc(u.firstName)} ${esc(u.lastName)}</option>`).join("")}</select>${tab("Assigned Leads", "assigned")}${tab("All Leads")}</div><div class="card"><div class="field"><label>Search leads</label><input id="lrmLeadSearch" value="${esc(filter.q)}" placeholder="Name, phone, lead ID..."></div></div><div class="toolbar"><b>${rows.length}</b><span class="muted">leads loaded · ${selected.size} selected${state.lrmLeadPagination?.total ? ` · ${state.lrmLeadPagination.total} total` : ""}</span></div><div class="lead-board">${cards || `<div class="empty">No leads found in this category.</div>`}</div><div class="toolbar" style="justify-content:center"><button type="button" class="btn" data-lrm-page="${page - 1}" ${page <= 1 ? "disabled" : ""}>Previous</button><span class="muted">Page ${page} of ${pages}</span><button type="button" class="btn" data-lrm-page="${page + 1}" ${page >= pages ? "disabled" : ""}>Next</button></div>`;
 }
 
 function leadForm(lead = {}) {
@@ -883,10 +900,11 @@ function bind() {
   document.querySelector("#clearLeadFilters")?.addEventListener("click", () => { Object.keys(state.leadFilters).forEach((k) => { state.leadFilters[k] = ""; }); state.pages.leads = 1; render(); });
   document.querySelector("#addLead")?.addEventListener("click", () => modal("Add Lead", leadForm(), (data) => api("/leads", { method: "POST", body: JSON.stringify(data) })));
   document.querySelectorAll("[data-lrm-select]").forEach((el) => el.onchange = () => { const id = el.dataset.lrmSelect; state.selectedLrmLeadIds = el.checked ? [...new Set([...state.selectedLrmLeadIds, id])] : state.selectedLrmLeadIds.filter((x) => x !== id); render(); });
-  document.querySelectorAll("[data-lrm-tab]").forEach((b) => b.onclick = async (e) => { e.preventDefault(); e.stopPropagation(); state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), assignment: b.dataset.lrmTab, status: b.dataset.lrmTabStatus || "", lrmId: "" }; await loadData(); });
-  document.querySelectorAll("[data-lrm-tab-status]:not([data-lrm-tab])").forEach((b) => b.onclick = async (e) => { e.preventDefault(); e.stopPropagation(); state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), assignment: "", status: b.dataset.lrmTabStatus || "", lrmId: "" }; await loadData(); });
-  document.querySelector("#lrmLeadOwner")?.addEventListener("change", async (e) => { state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), assignment: "", status: "", lrmId: e.target.value }; await loadData(); });
-  document.querySelector("#lrmLeadSearch")?.addEventListener("change", async (e) => { state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), q: e.target.value }; await loadData(); });
+  document.querySelectorAll("[data-lrm-tab]").forEach((b) => b.onclick = async (e) => { e.preventDefault(); e.stopPropagation(); state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), assignment: b.dataset.lrmTab, status: b.dataset.lrmTabStatus || "", lrmId: "" }; state.lrmLeadPage = 1; await loadLrmLeadData(); });
+  document.querySelectorAll("[data-lrm-tab-status]:not([data-lrm-tab])").forEach((b) => b.onclick = async (e) => { e.preventDefault(); e.stopPropagation(); state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), assignment: "", status: b.dataset.lrmTabStatus || "", lrmId: "" }; state.lrmLeadPage = 1; await loadLrmLeadData(); });
+  document.querySelector("#lrmLeadOwner")?.addEventListener("change", async (e) => { state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), assignment: "", status: "", lrmId: e.target.value }; state.lrmLeadPage = 1; await loadLrmLeadData(); });
+  document.querySelector("#lrmLeadSearch")?.addEventListener("change", async (e) => { state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), q: e.target.value }; state.lrmLeadPage = 1; await loadLrmLeadData(); });
+  document.querySelectorAll("[data-lrm-page]").forEach((b) => b.onclick = async () => { state.lrmLeadPage = Number(b.dataset.lrmPage); await loadLrmLeadData(); });
   document.querySelectorAll("[data-lrm-quality]").forEach((b) => b.onclick = () => { state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), status: b.dataset.lrmQuality }; render(); });
   document.querySelector("#assignSelectedLrm")?.addEventListener("click", () => {
     if (!state.selectedLrmLeadIds.length) return;
