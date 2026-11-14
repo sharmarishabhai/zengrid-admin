@@ -200,6 +200,7 @@ async function loadData() {
     // forbidden LRM request reject Promise.all and blank the whole account.
     if (isAdmin() || state.user?.userType === "sc") baseCalls.push(api("/plants"));
     if (isAdmin()) baseCalls.splice(2, 0, api("/users"), api("/users/lrms"));
+    else if (state.user?.userType === "lrm_tl") baseCalls.push(api("/users/lrms"));
     const settled = await Promise.allSettled(baseCalls);
     const failed = settled.filter((result) => result.status === "rejected");
     const data = settled.map((result) => result.status === "fulfilled" ? result.value : {});
@@ -210,7 +211,7 @@ async function loadData() {
       summary: data[0].summary || {},
       leads: data[1].leads || [],
       users: isAdmin() ? data[2].users || [] : [],
-      lrms: isAdmin() ? data[3].users || [] : [],
+      lrms: isAdmin() ? data[3].users || [] : state.user?.userType === "lrm_tl" ? (data.find((x) => Array.isArray(x.users) && x.users.some((u) => u.userType === "lrm"))?.users || []) : [],
       scs: data[2 + offset].users || [],
       configs: data[3 + offset].items || [],
       quotes: canManageCommercialDocs() ? data[4 + offset].quotes || [] : [],
@@ -290,8 +291,10 @@ function renderShell(content) {
     ? [["dashboard", "Admin Dashboard"], ["leads", "Lead Management"], ["plants", "Plant Locations"], ["team", "Team"], ["performance-sc", "SC Performance"], ["performance-lrm", "LRM Performance"], ["configuration", "Configuration"], ["records", "Records"]]
     : state.user?.userType === "sc"
     ? [["dashboard", "SC Dashboard"], ["leads", "My Leads"], ["records", "Records"]]
+    : state.user?.userType === "lrm_tl"
+    ? [["dashboard", "LRM TL Dashboard"], ["leads", "Team Leads"], ["performance", "Team Performance"], ["report", "Reports"]]
     : [["dashboard", "LRM Dashboard"], ["leads", "My Leads"], ["performance", "My Performance"], ["report", "Day-End Report"]];
-  const accessLabel = isAdmin() ? "Admin full access" : state.user?.userType === "sc" ? "SC workspace" : "LRM workspace";
+  const accessLabel = isAdmin() ? "Admin full access" : state.user?.userType === "sc" ? "SC workspace" : state.user?.userType === "lrm_tl" ? "LRM Team Lead workspace" : "LRM workspace";
   app.innerHTML = `<div class="shell"><aside class="side"><div class="brand"><div class="mark"></div><div>Zen Grid Solar<div class="sub">${esc(state.user?.firstName || "User")} / ${accessLabel}</div></div></div><div class="nav">${nav.map(([id, label]) => `<button class="${state.view === id ? "active" : ""}" data-view="${id}">${label}</button>`).join("")}</div><button class="btn danger" style="margin-top:20px;width:100%" id="logout">Logout</button></aside><main class="main">${content}</main></div>`;
   document.querySelectorAll("[data-view]").forEach((b) => b.onclick = () => { state.view = b.dataset.view; render(); });
   document.querySelector("#logout").onclick = () => { localStorage.clear(); Object.assign(state, { accessToken: "", user: null }); renderLogin(); };
@@ -340,9 +343,10 @@ function lrmDashboardView() {
   const calls = state.reports.reduce((sum, r) => sum + Number(r.totalCalls || 0), 0);
   const conversion = connected ? Math.round(((s.won || 0) / connected) * 100) : 0;
   const recent = state.leads.slice(0, 5);
-  return `${top("LRM Dashboard", "Your leads, calls, scheduled meetings and closures.")}
+  const teamLead = state.user?.userType === "lrm_tl";
+  return `${top(teamLead ? "LRM Team Lead Dashboard" : "LRM Dashboard", teamLead ? "Manage your team’s leads, quality and assignments." : "Your leads, calls, scheduled meetings and closures.")}
   <div class="stats">
-    ${[["My Leads", s.totalLeads], ["Assigned", state.leads.filter((l) => l.assignedToUserId).length], ["Connected Calls", connected], ["Total Calls", calls], ["Closed", s.won], ["Conversion", `${conversion}%`]].map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v || 0}</div></div>`).join("")}
+    ${[[teamLead ? "Team Leads" : "My Leads", state.leads.length], [teamLead ? "Assigned to LRMs" : "Assigned", state.leads.filter((l) => l.lrmAssignedToUserId && String(l.lrmAssignedToUserId) !== String(state.user?._id)).length], ["Connected Calls", connected], ["Total Calls", calls], ["Closed", s.won], ["Conversion", `${conversion}%`]].map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v || 0}</div></div>`).join("")}
   </div>
   <div class="grid two" style="margin-top:14px">
     <div class="card"><h3>Recent Leads</h3>${recent.map((l) => `<div class="card" style="margin-top:8px"><b>${esc(l.customerName)}</b><div class="muted">${esc(l.phone)} / ${esc(l.area)} / ${esc(l.leadStatus)}</div></div>`).join("") || `<div class="empty">No recent leads</div>`}</div>
