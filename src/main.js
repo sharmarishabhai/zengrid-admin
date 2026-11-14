@@ -364,7 +364,7 @@ function lrmDashboardView() {
   const s = state.summary;
   const connected = state.reports.reduce((sum, r) => sum + Number(r.connectedCalls || 0), 0);
   const calls = state.reports.reduce((sum, r) => sum + Number(r.totalCalls || 0), 0);
-  const conversion = connected ? Math.round(((s.won || 0) / connected) * 100) : 0;
+  const reportConversion = connected ? Math.round(((s.won || 0) / connected) * 100) : 0;
   const recent = state.leads.slice(0, 5);
   const teamLead = state.user?.userType === "lrm_tl";
   const teamMembers = teamLead ? state.lrms.filter((u) => u.userType === "lrm").length : 0;
@@ -372,7 +372,7 @@ function lrmDashboardView() {
   const conversion = state.leads.length ? Math.round((closed / state.leads.length) * 100) : 0;
   return `${top("Dashboard", teamLead ? "Team lead overview for all leads and team members." : "Your leads, calls, scheduled meetings and closures.")}
   <div class="stats">
-    ${[[teamLead ? "Total Leads" : "My Leads", state.leads.length], ...(teamLead ? [["Team Members", teamMembers], ["Assigned Leads", state.leads.filter((l) => l.assignedByUserId || l.lrmAssignedToUserId).length]] : [["Assigned", state.leads.filter((l) => l.assignedToUserId).length]]), ["Closed Leads", teamLead ? closed : s.won], ["Conversion", `${teamLead ? conversion : (connected ? Math.round(((s.won || 0) / connected) * 100) : 0)}%`]].map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v || 0}</div></div>`).join("")}
+    ${[[teamLead ? "Total Leads" : "My Leads", state.leads.length], ...(teamLead ? [["Team Members", teamMembers], ["Assigned Leads", state.leads.filter((l) => l.assignedByUserId || l.lrmAssignedToUserId).length]] : [["Assigned", state.leads.filter((l) => l.assignedToUserId).length]]), ["Closed Leads", teamLead ? closed : s.won], ["Conversion", `${teamLead ? conversion : reportConversion}%`]].map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v || 0}</div></div>`).join("")}
   </div>
   <div class="grid two" style="margin-top:14px">
     <div class="card"><h3>Recent Leads</h3>${recent.map((l) => `<div class="card" style="margin-top:8px"><b>${esc(l.customerName)}</b><div class="muted">${esc(l.phone)} / ${esc(l.area)} / ${esc(l.leadStatus)}</div></div>`).join("") || `<div class="empty">No recent leads</div>`}</div>
