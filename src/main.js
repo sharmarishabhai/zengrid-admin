@@ -152,6 +152,12 @@ async function api(path, options = {}) {
       }
     }
     const data = await res.json().catch(() => ({}));
+    if ((res.status === 401 || res.status === 403) && /session|token|authorized/i.test(data.message || "")) {
+      localStorage.removeItem("zg_admin_access"); localStorage.removeItem("zg_admin_refresh"); localStorage.removeItem("zg_admin_user");
+      Object.assign(state, { accessToken: "", refreshToken: "", user: null });
+      renderLogin();
+      throw new Error(data.message || "Session expired. Please log in again.");
+    }
     if (!res.ok) throw new Error(data.message || "Request failed");
     return data;
   } finally {
