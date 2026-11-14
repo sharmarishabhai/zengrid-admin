@@ -185,7 +185,13 @@ async function loadData() {
   try {
     const me = await api("/auth/me");
     state.user = me.user;
-    const leadEndpoint = isAdmin() ? "/leads?limit=5000" : "/leads/mine?limit=5000";
+    const leadFilter = state.user?.userType === "lrm_tl" ? (state.lrmLeadFilter || {}) : {};
+    const leadParams = new URLSearchParams({ limit: "5000" });
+    if (leadFilter.assignment) leadParams.set("assignment", leadFilter.assignment);
+    if (leadFilter.status) leadParams.set("lrmStatus", leadFilter.status);
+    if (leadFilter.lrmId) leadParams.set("lrmAssignedToUserId", leadFilter.lrmId);
+    if (leadFilter.q) leadParams.set("q", leadFilter.q);
+    const leadEndpoint = isAdmin() ? "/leads?limit=5000" : `/leads/mine?${leadParams.toString()}`;
     const canLoadLrmResources = isAdmin() || isLrm();
     const baseCalls = [
       api("/activities/summary"), api(leadEndpoint), canLoadLrmResources ? api("/users/scs") : Promise.resolve({ users: [] }), api("/config"),
@@ -877,11 +883,10 @@ function bind() {
   document.querySelector("#clearLeadFilters")?.addEventListener("click", () => { Object.keys(state.leadFilters).forEach((k) => { state.leadFilters[k] = ""; }); state.pages.leads = 1; render(); });
   document.querySelector("#addLead")?.addEventListener("click", () => modal("Add Lead", leadForm(), (data) => api("/leads", { method: "POST", body: JSON.stringify(data) })));
   document.querySelectorAll("[data-lrm-select]").forEach((el) => el.onchange = () => { const id = el.dataset.lrmSelect; state.selectedLrmLeadIds = el.checked ? [...new Set([...state.selectedLrmLeadIds, id])] : state.selectedLrmLeadIds.filter((x) => x !== id); render(); });
-  document.querySelectorAll("[data-lrm-tab]").forEach((b) => b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), assignment: b.dataset.lrmTab, status: b.dataset.lrmTabStatus || "", lrmId: "" }; render(); });
-  document.querySelectorAll("[data-lrm-tab-status]:not([data-lrm-tab])").forEach((b) => b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), assignment: "", status: b.dataset.lrmTabStatus || "", lrmId: "" }; render(); });
-  document.querySelector("#lrmLeadOwner")?.addEventListener("change", (e) => { state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), assignment: "", status: "", lrmId: e.target.value }; render(); });
-  document.querySelector("#lrmLeadSearch")?.addEventListener("change", (e) => { state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), q: e.target.value }; render(); });
-  document.querySelector("#lrmLeadStatus")?.addEventListener("change", (e) => { state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), status: e.target.value }; render(); });
+  document.querySelectorAll("[data-lrm-tab]").forEach((b) => b.onclick = async (e) => { e.preventDefault(); e.stopPropagation(); state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), assignment: b.dataset.lrmTab, status: b.dataset.lrmTabStatus || "", lrmId: "" }; await loadData(); });
+  document.querySelectorAll("[data-lrm-tab-status]:not([data-lrm-tab])").forEach((b) => b.onclick = async (e) => { e.preventDefault(); e.stopPropagation(); state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), assignment: "", status: b.dataset.lrmTabStatus || "", lrmId: "" }; await loadData(); });
+  document.querySelector("#lrmLeadOwner")?.addEventListener("change", async (e) => { state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), assignment: "", status: "", lrmId: e.target.value }; await loadData(); });
+  document.querySelector("#lrmLeadSearch")?.addEventListener("change", async (e) => { state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), q: e.target.value }; await loadData(); });
   document.querySelectorAll("[data-lrm-quality]").forEach((b) => b.onclick = () => { state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), status: b.dataset.lrmQuality }; render(); });
   document.querySelector("#assignSelectedLrm")?.addEventListener("click", () => {
     if (!state.selectedLrmLeadIds.length) return;
