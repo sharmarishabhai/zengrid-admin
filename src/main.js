@@ -46,6 +46,7 @@ const state = {
   perfMode: "tiles",
   pages: { leads: 1, quote: 1, payment: 1, gst: 1 },
   leadFilters: { q: "", leadStatus: "", source: "", assignedToUserId: "", assignedByUserId: "", meeting: "", meetingDateFrom: "", meetingDateTo: "", followUpDateFrom: "", followUpDateTo: "" },
+  selectedLrmLeadIds: [],
 };
 
 const css = `
@@ -462,6 +463,7 @@ ${docButtons(l._id)}
 }
 
 function leadsView() {
+  if (state.user?.userType === "lrm_tl") return lrmTeamLeadLeadsView();
   const f = state.leadFilters;
   const filtered = state.leads.filter((l) => {
     const q = f.q.toLowerCase();
@@ -487,6 +489,17 @@ function leadsView() {
   ${pager("leads", filtered.length)}
   <div class="lead-board">${leadRows(visibleLeads) || `<div class="empty">No leads found</div>`}</div>
   ${pager("leads", filtered.length)}`;
+}
+
+function lrmTeamLeadLeadsView() {
+  const statuses = ["New Lead", "Call Back", "Hot", "Average", "Cold", "Junk", "Won"];
+  const selected = new Set(state.selectedLrmLeadIds);
+  const filter = state.lrmLeadFilter || { q: "", status: "" };
+  const q = filter.q.toLowerCase();
+  const rows = state.leads.filter((l) => (!q || [l.customerName, l.phone, l.email, l.leadId, l.source].join(" ").toLowerCase().includes(q)) && (!filter.status || (l.lrmStatus || "New Lead") === filter.status)).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  const counts = Object.fromEntries(statuses.map((s) => [s, rows.filter((l) => (l.lrmStatus || "New Lead") === s).length]));
+  const cards = rows.map((l) => `<div class="card" style="padding:13px;display:flex;gap:12px;align-items:flex-start"><input type="checkbox" data-lrm-select="${l._id}" ${selected.has(l._id) ? "checked" : ""} style="margin-top:5px;width:18px;height:18px"><div style="flex:1"><div style="display:flex;justify-content:space-between;gap:10px"><div><b>${esc(l.customerName || "-")}</b><div class="muted">${esc(l.leadId || "-")} · ${esc(l.source || "-")} · ${esc(l.createdAt ? new Date(l.createdAt).toLocaleString() : "-")}</div></div><span class="pill ${badge(l.lrmStatus || "New Lead")}">${esc(l.lrmStatus || "New Lead")}</span></div><div class="muted" style="margin-top:7px">${esc(l.phone)}${l.email ? ` · ${esc(l.email)}` : ""} · ${esc(l.area || l.locality || "")}</div><div class="toolbar" style="margin:9px 0 0"><a class="btn compact" href="tel:${esc(l.phone)}">Call</a><a class="btn compact green" href="https://wa.me/${esc(String(l.whatsappNumber || l.phone).replace(/\D/g, ""))}" target="_blank" rel="noreferrer">WhatsApp</a><span class="muted">LRM: ${esc(state.lrms.find((u) => String(u._id) === String(l.lrmAssignedToUserId)) ? `${state.lrms.find((u) => String(u._id) === String(l.lrmAssignedToUserId)).firstName} ${state.lrms.find((u) => String(u._id) === String(l.lrmAssignedToUserId)).lastName}` : "Unassigned")}</span></div></div></div>`).join("");
+  return `${top("LRM Lead Management", "Assign unassigned leads to LRMs and monitor your team’s lead quality.", `<button class="btn" id="lrmSelectAll">Select visible</button><button class="btn primary" id="assignSelectedLrm" ${selected.size ? "" : "disabled"}>Assign ${selected.size || ""} selected</button>`)}<div class="lead-filters">${statuses.map((s) => `<button class="mini-stat" data-lrm-quality="${s}" style="text-align:left;border:1px solid var(--line);cursor:pointer"><span class="k">${esc(s)}</span><b>${counts[s]}</b></button>`).join("")}</div><div class="card"><div class="lead-filters" style="margin:0"><div class="field"><label>Search leads</label><input id="lrmLeadSearch" value="${esc(filter.q)}" placeholder="Name, phone, lead ID..."></div><div class="field"><label>Lead quality</label><select id="lrmLeadStatus"><option value="">All leads</option>${statuses.map((s) => `<option value="${s}" ${filter.status === s ? "selected" : ""}>${s}</option>`).join("")}</select></div></div></div><div class="toolbar"><b>${rows.length}</b><span class="muted">leads · ${selected.size} selected</span></div><div class="lead-board">${cards || `<div class="empty">No leads found in this category.</div>`}</div>`;
 }
 
 function leadForm(lead = {}) {
@@ -861,6 +874,16 @@ function bind() {
   });
   document.querySelector("#clearLeadFilters")?.addEventListener("click", () => { Object.keys(state.leadFilters).forEach((k) => { state.leadFilters[k] = ""; }); state.pages.leads = 1; render(); });
   document.querySelector("#addLead")?.addEventListener("click", () => modal("Add Lead", leadForm(), (data) => api("/leads", { method: "POST", body: JSON.stringify(data) })));
+  document.querySelectorAll("[data-lrm-select]").forEach((el) => el.onchange = () => { const id = el.dataset.lrmSelect; state.selectedLrmLeadIds = el.checked ? [...new Set([...state.selectedLrmLeadIds, id])] : state.selectedLrmLeadIds.filter((x) => x !== id); render(); });
+  document.querySelector("#lrmSelectAll")?.addEventListener("click", () => { const ids = [...document.querySelectorAll("[data-lrm-select]")].map((x) => x.dataset.lrmSelect); state.selectedLrmLeadIds = [...new Set([...state.selectedLrmLeadIds, ...ids])]; render(); });
+  document.querySelector("#lrmLeadSearch")?.addEventListener("input", (e) => { state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), q: e.target.value }; render(); });
+  document.querySelector("#lrmLeadStatus")?.addEventListener("change", (e) => { state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), status: e.target.value }; render(); });
+  document.querySelectorAll("[data-lrm-quality]").forEach((b) => b.onclick = () => { state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), status: b.dataset.lrmQuality }; render(); });
+  document.querySelector("#assignSelectedLrm")?.addEventListener("click", () => {
+    if (!state.selectedLrmLeadIds.length) return;
+    const options = state.lrms.filter((u) => u.userType === "lrm").map((u) => `<option value="${u._id}">${esc(u.firstName)} ${esc(u.lastName)}</option>`).join("");
+    modal("Assign selected leads to LRM", `<div class="field"><label>LRM</label><select name="lrmUserId" required><option value="">Select LRM</option>${options}</select></div>`, async (data) => { const result = await api("/leads/lrm-assign", { method: "PATCH", body: JSON.stringify({ leadIds: state.selectedLrmLeadIds, lrmUserId: data.lrmUserId }) }); state.selectedLrmLeadIds = []; await loadData(); return result; });
+  });
   document.querySelector("#downloadLeadSample")?.addEventListener("click", () => {
     const csv = "customerName,phone,whatsappNumber,email,address,area,locality,monthlyBill,source\nRahul Sharma,9876543210,9876543210,rahul@example.com,Lucknow,Aliganj,Lucknow,2500,Import\n";
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); a.download = "zengrid-leads-sample.csv"; a.click(); URL.revokeObjectURL(a.href);
