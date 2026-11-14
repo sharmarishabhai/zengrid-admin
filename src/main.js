@@ -427,6 +427,7 @@ function leadRows(rows = state.leads) {
         <button class="btn icon-btn primary" title="Quote" aria-label="Quote" data-quote="${id}">${icon("quote")}</button>
         <button class="btn icon-btn green" title="Receipt" aria-label="Receipt" data-pay="${id}">${icon("payment")}</button>
         ${isAdmin() ? `<button class="btn icon-btn" title="GST" aria-label="GST" data-gst="${id}">${icon("gst")}</button>` : ""}` : "";
+  const contactButtons = !isAdmin() ? `<a class="btn compact" href="tel:${esc(rows.find((x) => x._id === id)?.phone || "")}">Call</a><a class="btn compact green" target="_blank" rel="noreferrer" href="https://wa.me/${esc(String(rows.find((x) => x._id === id)?.whatsappNumber || rows.find((x) => x._id === id)?.phone || "").replace(/\D/g, ""))}">WhatsApp</a>` : "";
   return rows.map((l) => `
     <div class="lead-row" data-lead-open="${l._id}" role="button" tabindex="0">
       <div class="lead-head">
@@ -456,7 +457,7 @@ function leadRows(rows = state.leads) {
         <button class="btn icon-btn" title="Edit" aria-label="Edit" data-edit="${l._id}">${icon("edit")}</button>
         <button class="btn icon-btn blue" title="Assign" aria-label="Assign" data-assign="${l._id}">${icon("assign")}</button>
         <button class="btn icon-btn" title="History" aria-label="History" data-history="${l._id}">${icon("history")}</button>
-${docButtons(l._id)}
+        ${contactButtons}${docButtons(l._id)}
       </div>
     </div>
   `).join("");
