@@ -651,9 +651,8 @@ function lrmPerformanceView() {
 }
 
 function reportView() {
-  const reports = state.reports.filter((r) => !state.reportDateFilter || r.reportDate === state.reportDateFilter);
-  return `${top("Reports", "Team day-end reports and daily performance.", `<button class="btn primary" id="addReport">Add Report</button>`)}<div class="card"><div class="toolbar" style="margin:0"><div class="field"><label>Filter by day</label><input type="date" id="reportDateFilter" value="${esc(state.reportDateFilter || "")}"></div><button class="btn" id="clearReportDate">Clear</button></div></div>
-  <div class="card"><h3>Team LRM Reports</h3>${recordTable(reports, ["reportDate", "lrmName", "totalCalls", "connectedCalls", "meetingsScheduled", "meetingsDone", "ordersClosed"])}</div>`;
+  return `${top("Day-End Report", "Enter total calls, connected calls, meetings scheduled, meetings done and orders closed.", `<button class="btn primary" id="addReport">Add Today Report</button>`)}
+  <div class="card"><h3>Recent LRM Reports</h3>${recordTable(state.reports, ["reportDate", "totalCalls", "connectedCalls", "meetingsScheduled", "meetingsDone", "ordersClosed"])}</div>`;
 }
 
 function reportForm(r = {}) {
@@ -962,8 +961,6 @@ function bind() {
     modal(`Edit ${configPages[pageKey].label}`, configForm(pageKey, c), (data) => api(`/config/${pageKey}/${c._id}`, { method: "PATCH", body: JSON.stringify(data) }));
   });
   document.querySelector("#addReport")?.addEventListener("click", () => modal("Day-End Report", reportForm(), (data) => api("/activities/daily-reports", { method: "POST", body: JSON.stringify(data) })));
-  document.querySelector("#reportDateFilter")?.addEventListener("change", (e) => { state.reportDateFilter = e.target.value; render(); });
-  document.querySelector("#clearReportDate")?.addEventListener("click", () => { state.reportDateFilter = ""; render(); });
   document.querySelector("#addPlant")?.addEventListener("click", () => modal("Add Plant Location", plantForm(), (data) => api("/plants", { method: "POST", body: JSON.stringify(data) })));
   document.querySelectorAll("[data-edit-plant]").forEach((b) => b.onclick = () => { const p = state.plants.find((x) => x._id === b.dataset.editPlant); modal("Edit Plant Location", plantForm(p), (data) => api("/plants", { method: "POST", body: JSON.stringify(data) })); });
   document.querySelectorAll("[data-delete-plant]").forEach((b) => b.onclick = async () => { if (!confirm("Delete this plant location?")) return; try { await api(`/plants/${b.dataset.deletePlant}`, { method: "DELETE" }); await loadData(); } catch (e) { toast(e.message); } });
