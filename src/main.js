@@ -300,7 +300,7 @@ function top(title, sub, action = "") {
 
 function performanceTiles(rows, keys, type) {
   if (!rows.length) return `<div class="empty">No ${type} performance data</div>`;
-  return `<div class="grid two">${rows.map((row) => `<div class="card"><div class="lead-head" style="align-items:flex-start"><div class="avatar">${esc((row.name || "?").slice(0, 1).toUpperCase())}</div><div><div class="lead-name">${esc(row.name || "-")}</div><div class="muted">${type === "sc" ? "Sales Counselor" : "Lead Relationship Manager"}</div></div></div><div class="grid two" style="margin-top:14px">${keys.map((k) => `<div class="mini-stat"><span class="k">${k}</span><b>${esc(String(row[k] ?? 0))}</b></div>`).join("")}</div></div>`).join("")}</div>`;
+  return `<div class="grid two">${rows.map((row) => `<div class="card"><div class="lead-head" style="align-items:flex-start"><div class="avatar">${esc((row.name || "?").slice(0, 1).toUpperCase())}</div><div><div class="lead-name">${esc(row.name || "-")}</div><div class="muted">${type === "sc" ? "Sales Counselor" : row.role === "lrm_tl" ? "LRM Team Lead" : "Lead Relationship Manager"}</div></div></div><div class="grid two" style="margin-top:14px">${keys.map((k) => `<div class="mini-stat"><span class="k">${k}</span><b>${esc(String(row[k] ?? 0))}</b></div>`).join("")}</div></div>`).join("")}</div>`;
 }
 
 function performanceTable(rows, keys) {
