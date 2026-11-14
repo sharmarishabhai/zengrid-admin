@@ -508,7 +508,7 @@ function teamView() {
 }
 
 function userForm(u = {}) {
-  const reportsTo = u.userType === "lrm" ? `<div class="field"><label>Reports to (LRM Team Lead)</label><select name="reportsToUserId"><option value="">None</option>${state.users.filter((x) => x.userType === "lrm_tl").map((x) => `<option value="${x._id}" ${String(u.reportsToUserId || "") === String(x._id) ? "selected" : ""}>${esc(x.firstName)} ${esc(x.lastName)}</option>`).join("")}</select></div>` : "";
+  const reportsTo = `<div class="field" id="reportsToField" style="${u.userType && u.userType !== "lrm" ? "display:none" : ""}"><label>Reports to (LRM Team Lead)</label><select name="reportsToUserId"><option value="">None</option>${state.users.filter((x) => x.userType === "lrm_tl").map((x) => `<option value="${x._id}" ${String(u.reportsToUserId || "") === String(x._id) ? "selected" : ""}>${esc(x.firstName)} ${esc(x.lastName)}</option>`).join("")}</select></div>`;
   return `<div class="grid two"><div class="field"><label>First Name</label><input name="firstName" required value="${esc(u.firstName)}"></div><div class="field"><label>Last Name</label><input name="lastName" required value="${esc(u.lastName)}"></div><div class="field"><label>Phone</label><input name="phoneNumber" required value="${esc(u.phoneNumber)}"></div><div class="field"><label>Email</label><input name="email" required value="${esc(u.email)}"></div><div class="field"><label>Password</label><input type="password" name="password"></div><div class="field"><label>Role</label><select name="userType"><option value="lrm_tl" ${u.userType === "lrm_tl" ? "selected" : ""}>LRM Team Lead</option><option value="lrm" ${u.userType === "lrm" ? "selected" : ""}>LRM</option><option value="sc" ${u.userType === "sc" ? "selected" : ""}>SC</option></select></div>${reportsTo}<div class="field"><label>Status</label><select name="status">${["active", "inactive", "blocked"].map((x) => `<option ${u.status === x ? "selected" : ""}>${x}</option>`).join("")}</select></div></div>`;
 }
 
@@ -884,6 +884,10 @@ function bind() {
   document.querySelectorAll("[data-gst]").forEach((b) => b.onclick = (e) => { e.stopPropagation(); openGst(b.dataset.gst); });
   bindSendButtons();
   document.querySelector("#addUser")?.addEventListener("click", () => modal("Add Team Member", userForm(), (data) => { if (!data.password) delete data.password; return api("/users", { method: "POST", body: JSON.stringify(data) }); }));
+  document.querySelector('select[name="userType"]')?.addEventListener("change", (e) => {
+    const field = document.querySelector("#reportsToField");
+    if (field) field.style.display = e.target.value === "lrm" ? "" : "none";
+  });
   document.querySelectorAll("[data-user]").forEach((b) => b.onclick = () => { const u = state.users.find((x) => x._id === b.dataset.user); modal("Edit Team Member", userForm(u), (data) => { if (!data.password) delete data.password; return api(`/users/${u._id}`, { method: "PATCH", body: JSON.stringify(data) }); }); });
   document.querySelectorAll("[data-config-page]").forEach((b) => b.onclick = () => { state.configPage = b.dataset.configPage; render(); });
   document.querySelector("#addConfig")?.addEventListener("click", () => {
