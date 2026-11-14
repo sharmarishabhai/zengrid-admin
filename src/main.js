@@ -878,7 +878,7 @@ function bind() {
   document.querySelector("#addLead")?.addEventListener("click", () => modal("Add Lead", leadForm(), (data) => api("/leads", { method: "POST", body: JSON.stringify(data) })));
   document.querySelectorAll("[data-lrm-select]").forEach((el) => el.onchange = () => { const id = el.dataset.lrmSelect; state.selectedLrmLeadIds = el.checked ? [...new Set([...state.selectedLrmLeadIds, id])] : state.selectedLrmLeadIds.filter((x) => x !== id); render(); });
   document.querySelectorAll("[data-lrm-tab]").forEach((b) => b.onclick = () => { state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), assignment: b.dataset.lrmTab, status: b.dataset.lrmTabStatus || "", lrmId: "" }; render(); });
-  document.querySelectorAll("[data-lrm-tab-status]").forEach((b) => b.onclick = () => { state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), assignment: "", status: b.dataset.lrmTabStatus || "", lrmId: "" }; render(); });
+  document.querySelectorAll("[data-lrm-tab-status]:not([data-lrm-tab])").forEach((b) => b.onclick = () => { state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), assignment: "", status: b.dataset.lrmTabStatus || "", lrmId: "" }; render(); });
   document.querySelector("#lrmLeadOwner")?.addEventListener("change", (e) => { state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), assignment: "", status: "", lrmId: e.target.value }; render(); });
   document.querySelector("#lrmLeadSearch")?.addEventListener("input", (e) => { state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), q: e.target.value }; render(); });
   document.querySelector("#lrmLeadStatus")?.addEventListener("change", (e) => { state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), status: e.target.value }; render(); });
