@@ -89,7 +89,7 @@ const active = (type) => state.configs.filter((x) => x.type === type && x.status
 const badge = (s) => s === "Won" || s === "done" || s === "active" ? "pgreen" : s === "Lost" || s === "Not Interested" ? "pred" : s === "Interested" ? "ppurple" : s === "Follow Up" || s === "Rescheduled" ? "porange" : "pblue";
 const quoteTaxDefaults = () => active("tax-subsidy")[0] || { gstPercent: 8.9, centralSubsidy: 78000, upnedaSubsidy: 30000 };
 const isAdmin = () => state.user?.userType === "admin";
-const isLrm = () => state.user?.userType === "lrm";
+const isLrm = () => state.user?.userType === "lrm" || state.user?.userType === "lrm_tl";
 const canManageCommercialDocs = () => isAdmin() || state.user?.userType === "sc";
 const leadKey = (leadId) => String(leadId?._id || leadId || "");
 const pageSize = { leads: 25, quote: 10, payment: 10, gst: 10 };
@@ -469,7 +469,7 @@ function leadsView() {
   const visibleLeads = pageRows(filtered, "leads");
   const select = (name, value, options, label) => `<div class="field"><label>${label}</label><select data-lead-filter="${name}"><option value="">All ${label}</option>${options.map((x) => `<option value="${esc(x.value || x)}" ${String(value) === String(x.value || x) ? "selected" : ""}>${esc(x.label || x)}</option>`).join("")}</select></div>`;
   const activeFilters = Object.values(f).some(Boolean);
-  return `${top("Lead Management", "Create, assign, update status, schedule follow-ups and generate records.", `<button class="btn primary" id="addLead">Add Lead</button>`)}
+  return `${top("Lead Management", "Create, assign, update status, schedule follow-ups and generate records.", `<button class="btn" id="downloadLeadSample">Download sample</button><button class="btn" id="importLeads">Import leads</button><button class="btn primary" id="addLead">Add Lead</button>`)}
   <div class="lead-filters">
     <div class="mini-stat"><span class="k">Won</span><b>${won}</b></div>
     <div class="mini-stat"><span class="k">Follow Ups</span><b>${follow}</b></div>
@@ -503,12 +503,12 @@ function leadForm(lead = {}) {
 }
 
 function teamView() {
-  return `${top("Team Management", "Admin can add only LRMs and SCs. No admin add feature exists.", `<button class="btn primary" id="addUser">Add LRM / SC</button>`)}
+  return `${top("Team Management", "Manage LRM team leads, LRMs and SCs.", `<button class="btn primary" id="addUser">Add Team Member</button>`)}
   <div class="card"><table><thead><tr><th>Name</th><th>Contact</th><th>Role</th><th>Status</th><th>Action</th></tr></thead><tbody>${state.users.map((u) => `<tr><td><b>${esc(u.firstName)} ${esc(u.lastName)}</b><br>${esc(u.email)}</td><td>${esc(u.phoneNumber)}</td><td><span class="pill ${u.userType === "lrm" ? "porange" : "pblue"}">${u.userType}</span></td><td><span class="pill ${badge(u.status)}">${u.status}</span></td><td><button class="btn" data-user="${u._id}">Edit</button></td></tr>`).join("")}</tbody></table></div>`;
 }
 
 function userForm(u = {}) {
-  return `<div class="grid two"><div class="field"><label>First Name</label><input name="firstName" required value="${esc(u.firstName)}"></div><div class="field"><label>Last Name</label><input name="lastName" required value="${esc(u.lastName)}"></div><div class="field"><label>Phone</label><input name="phoneNumber" required value="${esc(u.phoneNumber)}"></div><div class="field"><label>Email</label><input name="email" required value="${esc(u.email)}"></div><div class="field"><label>Password</label><input type="password" name="password"></div><div class="field"><label>Role</label><select name="userType"><option value="lrm" ${u.userType === "lrm" ? "selected" : ""}>LRM</option><option value="sc" ${u.userType === "sc" ? "selected" : ""}>SC</option></select></div><div class="field"><label>Status</label><select name="status">${["active", "inactive", "blocked"].map((x) => `<option ${u.status === x ? "selected" : ""}>${x}</option>`).join("")}</select></div></div>`;
+  return `<div class="grid two"><div class="field"><label>First Name</label><input name="firstName" required value="${esc(u.firstName)}"></div><div class="field"><label>Last Name</label><input name="lastName" required value="${esc(u.lastName)}"></div><div class="field"><label>Phone</label><input name="phoneNumber" required value="${esc(u.phoneNumber)}"></div><div class="field"><label>Email</label><input name="email" required value="${esc(u.email)}"></div><div class="field"><label>Password</label><input type="password" name="password"></div><div class="field"><label>Role</label><select name="userType"><option value="lrm_tl" ${u.userType === "lrm_tl" ? "selected" : ""}>LRM Team Lead</option><option value="lrm" ${u.userType === "lrm" ? "selected" : ""}>LRM</option><option value="sc" ${u.userType === "sc" ? "selected" : ""}>SC</option></select></div><div class="field"><label>Reports to (for LRM)</label><select name="reportsToUserId"><option value="">None</option>${state.users.filter((x) => x.userType === "lrm_tl").map((x) => `<option value="${x._id}" ${String(u.reportsToUserId || "") === String(x._id) ? "selected" : ""}>${esc(x.firstName)} ${esc(x.lastName)}</option>`).join("")}</select></div><div class="field"><label>Status</label><select name="status">${["active", "inactive", "blocked"].map((x) => `<option ${u.status === x ? "selected" : ""}>${x}</option>`).join("")}</select></div></div>`;
 }
 
 function configView() {
@@ -853,6 +853,15 @@ function bind() {
   });
   document.querySelector("#clearLeadFilters")?.addEventListener("click", () => { Object.keys(state.leadFilters).forEach((k) => { state.leadFilters[k] = ""; }); state.pages.leads = 1; render(); });
   document.querySelector("#addLead")?.addEventListener("click", () => modal("Add Lead", leadForm(), (data) => api("/leads", { method: "POST", body: JSON.stringify(data) })));
+  document.querySelector("#downloadLeadSample")?.addEventListener("click", () => {
+    const csv = "customerName,phone,whatsappNumber,email,address,area,locality,monthlyBill,source\nRahul Sharma,9876543210,9876543210,rahul@example.com,Lucknow,Aliganj,Lucknow,2500,Import\n";
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); a.download = "zengrid-leads-sample.csv"; a.click(); URL.revokeObjectURL(a.href);
+  });
+  document.querySelector("#importLeads")?.addEventListener("click", () => {
+    const input = document.createElement("input"); input.type = "file"; input.accept = ".csv";
+    input.onchange = async () => { const file = input.files?.[0]; if (!file) return; const lines = (await file.text()).trim().split(/\r?\n/); const headers = lines.shift().split(",").map((x) => x.trim()); const leads = lines.filter(Boolean).map((line) => { const values = line.split(","); return headers.reduce((o, h, i) => { o[h] = (values[i] || "").trim(); return o; }, {}); }); await api("/leads/import", { method: "POST", body: JSON.stringify({ leads }) }); };
+    input.click();
+  });
   document.querySelectorAll("[data-lead-open]").forEach((row) => {
     const open = () => leadDetailModal(row.dataset.leadOpen);
     row.onclick = (e) => {
