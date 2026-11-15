@@ -989,6 +989,7 @@ function render() {
     report: reportView,
   };
   renderShell((views[state.view] || dashboardView)());
+  if (state.user?.userType === "lrm_tl") document.querySelectorAll(".toolbar .muted").forEach((node) => { if (node.textContent.includes("leads loaded")) node.textContent = `Total ${state.lrmLeadPagination?.total || 0} leads · ${state.selectedLrmLeadIds.size} selected`; });
   bind();
 }
 
