@@ -644,7 +644,9 @@ function scPerformanceView() {
 function lrmPerformanceView() {
   const rows = state.performance.lrm || [];
   const mode = state.perfMode || "tiles";
-  return `${top("LRM Performance", "Dedicated LRM performance page with tile and table views.", `<div class="subnav"><button class="${mode === "tiles" ? "active" : ""}" data-perf-mode="tiles">Tiles</button><button class="${mode === "table" ? "active" : ""}" data-perf-mode="table">Table</button></div>`) }
+  const title = state.user?.userType === "lrm_tl" ? "Team Performance" : "LRM Performance";
+  const subtitle = state.user?.userType === "lrm_tl" ? "Performance of you and all LRMs assigned to your team." : "Dedicated LRM performance page with tile and table views.";
+  return `${top(title, subtitle, `<div class="subnav"><button class="${mode === "tiles" ? "active" : ""}" data-perf-mode="tiles">Tiles</button><button class="${mode === "table" ? "active" : ""}" data-perf-mode="table">Table</button></div>`) }
   ${mode === "tiles" ? performanceTiles(rows, ["totalCalls", "connectedCalls", "meetingsScheduled", "meetingsDone", "ordersClosed", "conversionPercentage"], "lrm") : performanceTable(rows, ["name", "totalCalls", "connectedCalls", "meetingsScheduled", "meetingsDone", "ordersClosed", "conversionPercentage"])}`;
 }
 
