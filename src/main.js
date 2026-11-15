@@ -95,7 +95,7 @@ const badge = (s) => s === "Won" || s === "done" || s === "active" ? "pgreen" : 
 const quoteTaxDefaults = () => active("tax-subsidy")[0] || { gstPercent: 8.9, centralSubsidy: 78000, upnedaSubsidy: 30000 };
 const isAdmin = () => state.user?.userType === "admin";
 const isLrm = () => state.user?.userType === "lrm" || state.user?.userType === "lrm_tl";
-const canManageCommercialDocs = () => isAdmin() || state.user?.userType === "sc";
+const canManageCommercialDocs = () => isAdmin() || state.user?.userType === "sc" || state.user?.userType === "lrm_tl";
 const leadKey = (leadId) => String(leadId?._id || leadId || "");
 const pageSize = { leads: 25, quote: 10, payment: 10, gst: 10 };
 const clampPage = (page, total, size) => Math.min(Math.max(1, page), Math.max(1, Math.ceil(total / size)));
@@ -320,7 +320,7 @@ function renderShell(content) {
     : state.user?.userType === "sc"
     ? [["dashboard", "SC Dashboard"], ["leads", "My Leads"], ["records", "Records"]]
     : state.user?.userType === "lrm_tl"
-    ? [["dashboard", "LRM TL Dashboard"], ["leads", "Team Leads"], ["performance", "Team Performance"], ["report", "Reports"]]
+    ? [["dashboard", "LRM TL Dashboard"], ["leads", "Team Leads"], ["lead-management", "Lead Management"], ["performance", "Team Performance"], ["report", "Reports"]]
     : [["dashboard", "LRM Dashboard"], ["leads", "My Leads"], ["performance", "My Performance"], ["report", "Day-End Report"]];
   const accessLabel = isAdmin() ? "Admin full access" : state.user?.userType === "sc" ? "SC workspace" : state.user?.userType === "lrm_tl" ? "LRM Team Lead workspace" : "LRM workspace";
   app.innerHTML = `<div class="shell"><aside class="side"><div class="brand"><div class="mark"></div><div>Zen Grid Solar<div class="sub">${esc(state.user?.firstName || "User")} / ${accessLabel}</div></div></div><div class="nav">${nav.map(([id, label]) => `<button class="${state.view === id ? "active" : ""}" data-view="${id}">${label}</button>`).join("")}</div><button class="btn danger" style="margin-top:20px;width:100%" id="logout">Logout</button></aside><main class="main">${content}</main></div>`;
@@ -462,9 +462,9 @@ function leadDetailModal(id) {
 function leadRows(rows = state.leads) {
   const docButtons = (id) => canManageCommercialDocs() ? `
         <button class="btn icon-btn primary" title="Quote" aria-label="Quote" data-quote="${id}">${icon("quote")}</button>
-        <button class="btn icon-btn green" title="Receipt" aria-label="Receipt" data-pay="${id}">${icon("payment")}</button>
+        ${state.user?.userType === "lrm_tl" ? "" : `<button class="btn icon-btn green" title="Receipt" aria-label="Receipt" data-pay="${id}">${icon("payment")}</button>`}
         ${isAdmin() ? `<button class="btn icon-btn" title="GST" aria-label="GST" data-gst="${id}">${icon("gst")}</button>` : ""}` : "";
-  const contactButtons = !isAdmin() ? `<a class="btn compact" href="tel:${esc(rows.find((x) => x._id === id)?.phone || "")}">Call</a><a class="btn compact green" target="_blank" rel="noreferrer" href="https://wa.me/${esc(String(rows.find((x) => x._id === id)?.whatsappNumber || rows.find((x) => x._id === id)?.phone || "").replace(/\D/g, ""))}">WhatsApp</a>` : "";
+  const contactButtons = !isAdmin() && state.user?.userType !== "lrm_tl" ? `<a class="btn compact" href="tel:${esc(rows.find((x) => x._id === id)?.phone || "")}">Call</a><a class="btn compact green" target="_blank" rel="noreferrer" href="https://wa.me/${esc(String(rows.find((x) => x._id === id)?.whatsappNumber || rows.find((x) => x._id === id)?.phone || "").replace(/\D/g, ""))}">WhatsApp</a>` : "";
   return rows.map((l) => `
     <div class="lead-row" data-lead-open="${l._id}" role="button" tabindex="0">
       <div class="lead-head">
@@ -501,7 +501,7 @@ function leadRows(rows = state.leads) {
 }
 
 function leadsView() {
-  if (state.user?.userType === "lrm_tl") return lrmTeamLeadLeadsView();
+  if (state.user?.userType === "lrm_tl" && state.view !== "lead-management") return lrmTeamLeadLeadsView();
   const f = state.leadFilters;
   const filtered = state.leads.filter((l) => {
     const q = f.q.toLowerCase();
@@ -1007,6 +1007,7 @@ function render() {
   const views = {
     dashboard: dashboardView,
     leads: leadsView,
+    "lead-management": leadsView,
     plants: plantsView,
     team: teamView,
     configuration: configView,
