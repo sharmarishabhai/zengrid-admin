@@ -519,7 +519,8 @@ function leadsView() {
   const visibleLeads = pageRows(filtered, "leads");
   const select = (name, value, options, label) => `<div class="field"><label>${label}</label><select data-lead-filter="${name}"><option value="">All ${label}</option>${options.map((x) => `<option value="${esc(x.value || x)}" ${String(value) === String(x.value || x) ? "selected" : ""}>${esc(x.label || x)}</option>`).join("")}</select></div>`;
   const activeFilters = Object.values(f).some(Boolean);
-  return `${top("Lead Management", "Create, assign, update status, schedule follow-ups and generate records.", `<button class="btn" id="downloadLeadSample">Download sample</button><button class="btn" id="importLeads">Import leads</button><button class="btn primary" id="addLead">Add Lead</button>`)}
+  const leadActions = state.user?.userType === "lrm" ? `<button class="btn primary" id="addLead">Add Lead</button>` : `<button class="btn" id="downloadLeadSample">Download sample</button><button class="btn" id="importLeads">Import leads</button><button class="btn primary" id="addLead">Add Lead</button>`;
+  return `${top("Lead Management", "Create, assign, update status, schedule follow-ups and generate records.", leadActions)}
   <div class="lead-filters">
     <div class="mini-stat"><span class="k">Won</span><b>${won}</b></div>
     <div class="mini-stat"><span class="k">Follow Ups</span><b>${follow}</b></div>
