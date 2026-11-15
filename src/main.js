@@ -344,6 +344,16 @@ function stats() {
   </div>`;
 }
 
+function dashboardVisuals() {
+  const s = state.summary || {};
+  const status = Object.entries(s.leadStatus || {});
+  const total = Math.max(Number(s.totalLeads) || 0, 1);
+  const won = Number(s.won) || 0;
+  const conversion = Math.min(100, Math.round((won / total) * 100));
+  const colors = ["#4c118f", "#8fa57f", "#f5a623", "#2d8cff", "#d94f70", "#6b7280"];
+  return `<style>@keyframes zgDashRise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}@keyframes zgDashSpin{from{transform:rotate(-90deg)}to{transform:rotate(0)}}.dashboard-visual{animation:zgDashRise .45s ease both}.dashboard-donut{width:132px;height:132px;border-radius:50%;background:conic-gradient(var(--brand) ${conversion}%,#eee8f8 0);display:grid;place-items:center;animation:zgDashSpin .8s ease both}.dashboard-donut:after{content:"";width:92px;height:92px;border-radius:50%;background:#fff}.dashboard-donut-label{position:absolute;text-align:center;z-index:1;font-weight:950;color:var(--brand)}.dashboard-bar{height:9px;border-radius:99px;background:#eee8f8;overflow:hidden}.dashboard-bar span{display:block;height:100%;border-radius:inherit;transform-origin:left;animation:zgDashBar .8s ease both}@keyframes zgDashBar{from{transform:scaleX(0)}}@media(max-width:600px){.dashboard-visual-grid{grid-template-columns:1fr!important}}</style><div class="grid two dashboard-visual-grid dashboard-visual" style="margin-top:14px;grid-template-columns:1fr 1.6fr"><div class="card dashboard-card"><h3>Conversion <span class="muted">${conversion}%</span></h3><div style="display:flex;justify-content:center;position:relative;margin:18px 0"><div class="dashboard-donut"></div><div class="dashboard-donut-label">${won}<small style="display:block;font-size:10px;color:var(--muted)">closed</small></div></div></div><div class="card dashboard-card"><h3>Lead status <span class="muted">${s.totalLeads || 0} total</span></h3>${status.slice(0,6).map(([label,value],i)=>`<div style="margin:12px 0"><div style="display:flex;justify-content:space-between;font-weight:800;font-size:12px"><span>${esc(label)}</span><span>${value || 0}</span></div><div class="dashboard-bar"><span style="width:${Math.min(100,Math.round((Number(value)||0)/total*100))}%;background:${colors[i%colors.length]}"></span></div></div>`).join("") || `<div class="empty">No lead status data</div>`}</div></div>`;
+}
+
 function dashboardView() {
   if (isLrm()) return lrmDashboardView();
   const status = Object.entries(state.summary.leadStatus || {});
@@ -351,7 +361,7 @@ function dashboardView() {
   const recentLeads = state.leads.slice(0, 5);
   const maxStatus = Math.max(...status.map(([, v]) => Number(v) || 0), 1);
   const maxRevenue = Math.max(...revenue.map(([, v]) => Number(v) || 0), 1);
-  return `<div class="card dashboard-hero"><div class="grid two"><div><h2>Good day, ${esc(state.user?.firstName || "Team")} 👋</h2><p>Here’s the pulse of your solar operations today.</p></div><div style="display:flex;justify-content:flex-end;align-items:center"><button class="btn" data-dashboard-action="leads">View all leads →</button></div></div></div>${stats()}
+  return `<div class="card dashboard-hero"><div class="grid two"><div><h2>Good day, ${esc(state.user?.firstName || "Team")} 👋</h2><p>Here’s the pulse of your solar operations today.</p></div><div style="display:flex;justify-content:flex-end;align-items:center"><button class="btn" data-dashboard-action="leads">View all leads →</button></div></div></div>${stats()}${dashboardVisuals()}
   <div class="grid two dashboard-grid" style="margin-top:14px">
     <div class="card dashboard-card"><h3>Lead pipeline <button class="dashboard-link" data-dashboard-action="leads">Open leads</button></h3><div>${status.map(([k, v]) => `<div class="dashboard-status" data-dashboard-status="${esc(k)}"><span>${esc(k)}</span><b>${v}</b><div class="bar"><span style="width:${Math.round((Number(v) / maxStatus) * 100)}%"></span></div></div>`).join("") || `<div class="empty">No status data</div>`}</div></div>
     <div class="card dashboard-card"><h3>Revenue trend <span class="muted">Monthly</span></h3><div class="bars">${revenue.map(([k, v]) => `<div>${esc(k)} <b style="float:right">${rupee(v)}</b></div><div class="bar"><span style="width:${Math.round((Number(v) / maxRevenue) * 100)}%"></span></div>`).join("") || `<div class="empty">No revenue yet</div>`}</div></div>
@@ -370,7 +380,7 @@ function lrmDashboardView() {
   return `${top(teamLead ? "LRM Team Lead Dashboard" : "LRM Dashboard", teamLead ? "Manage your team’s leads, quality and assignments." : "Your leads, calls, scheduled meetings and closures.")}
   <div class="stats">
     ${[[teamLead ? "Total Leads" : "My Leads", teamLead ? s.totalLeads : state.leads.length], ...(teamLead ? [["Team Members", state.lrms.filter((u) => u.userType === "lrm").length], ["Assigned Leads", s.totalAssignedLeads || 0]] : [["Assigned", state.leads.filter((l) => l.assignedToUserId).length]]), ["Closed Leads", s.won], ["Conversion", `${teamLead ? (s.totalLeads ? Math.round(((s.won || 0) / s.totalLeads) * 100) : 0) : conversion}%`]].map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v || 0}</div></div>`).join("")}
-  </div>
+  </div>${dashboardVisuals()}
   <div class="grid two" style="margin-top:14px">
     <div class="card"><h3>Recent Leads</h3>${recent.map((l) => `<div class="card" style="margin-top:8px"><b>${esc(l.customerName)}</b><div class="muted">${esc(l.phone)} / ${esc(l.area)} / ${esc(l.leadStatus)}</div></div>`).join("") || `<div class="empty">No recent leads</div>`}</div>
     <div class="card"><h3>Available SC</h3>${state.scs.map((u) => `<div class="card" style="margin-top:8px"><b>${esc(u.firstName)} ${esc(u.lastName)}</b><div class="muted">${esc(u.phoneNumber)} / ${esc(u.status)}</div></div>`).join("") || `<div class="empty">No SC found</div>`}</div>
