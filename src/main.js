@@ -5,6 +5,7 @@ const apiUrl = (path) => `${API_BASE}/${String(path).replace(/^\/+/, "")}`;
 const app = document.querySelector("#app");
 
 const leadStatuses = ["New Lead", "Contacted", "Interested", "Follow Up", "Not Available", "Not Picking Call", "Rescheduled", "Not Interested", "Won", "Lost"];
+const lrmLeadStatuses = ["New Lead", "Call Back", "Hot", "Average", "Cold", "Junk", "Won"];
 const floors = ["G", "G+1", "G+2", "G+3", "G+4", "G+5"];
 const configLabels = {
   "system-size": "System Size",
@@ -480,7 +481,7 @@ function leadRows(rows = state.leads) {
       </div>
       <div>
         <div class="meta-title">Pipeline</div>
-        <div><span class="pill ${badge(l.leadStatus)}">${esc(l.leadStatus)}</span></div>
+        <div><span class="pill ${badge(l.leadStatus)}">${esc(l.leadStatus)}</span><span class="pill ${badge(l.lrmStatus)}" style="margin-left:5px">LRM: ${esc(l.lrmStatus || "New Lead")}</span></div>
       </div>
       <div>
         <div class="meta-title">Ownership</div>
@@ -559,7 +560,7 @@ function leadForm(lead = {}) {
     <div class="field"><label>Address</label><input name="address" value="${esc(lead.address)}"></div><div class="field"><label>Area</label><input name="area" value="${esc(lead.area)}"></div><div class="field"><label>Locality</label><input name="locality" value="${esc(lead.locality)}"></div>
     ${assigneeFields}
     <div class="field"><label>Monthly Bill</label><input type="number" name="monthlyBill" value="${lead.monthlyBill || ""}"></div><div class="field"><label>Source</label><select name="source">${["Website", "Social Media", "Field Visit", "Import"].map((x) => `<option ${lead.source === x ? "selected" : ""}>${x}</option>`).join("")}</select></div>
-    <div class="field"><label>Status</label><select name="leadStatus">${leadStatuses.map((x) => `<option ${lead.leadStatus === x ? "selected" : ""}>${x}</option>`).join("")}</select></div><div class="field"><label>Follow-up Date</label><input type="date" name="followUpDate" value="${esc(lead.followUpDate)}"></div>
+    <div class="field"><label>Main Lead Status</label><select name="leadStatus">${leadStatuses.map((x) => `<option ${lead.leadStatus === x ? "selected" : ""}>${x}</option>`).join("")}</select></div><div class="field"><label>LRM Lead Status</label><select name="lrmStatus">${lrmLeadStatuses.map((x) => `<option ${String(lead.lrmStatus || "New Lead") === x ? "selected" : ""}>${x}</option>`).join("")}</select></div><div class="field"><label>Follow-up Date</label><input type="date" name="followUpDate" value="${esc(lead.followUpDate)}"></div>
     <div class="field"><label>Meeting Date</label><input type="date" name="meetingDate" value="${esc(lead.meetingDate)}"></div><div class="field"><label>Meeting Time</label><input type="time" name="meetingTime" value="${esc(lead.meetingTime)}"></div>
     <div class="field" style="grid-column:1/-1"><label>Notes</label><textarea name="note">${esc(lead.note)}</textarea></div></div>`;
 }
