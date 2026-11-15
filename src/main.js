@@ -515,7 +515,7 @@ function leadsView() {
 }
 
 function lrmTeamLeadLeadsView() {
-  const statuses = [];
+  const statuses = ["Call Back", "Hot", "Average", "Cold", "Junk", "Won"];
   const selected = new Set(state.selectedLrmLeadIds);
   const filter = state.lrmLeadFilter || { q: "", status: "", assignment: "", lrmId: "" };
   const q = String(filter.q || "").toLowerCase();
