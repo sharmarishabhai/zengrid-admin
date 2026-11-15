@@ -189,8 +189,9 @@ async function loadData() {
   try {
     const me = await api("/auth/me");
     state.user = me.user;
-    const leadFilter = state.user?.userType === "lrm_tl" ? (state.lrmLeadFilter || { assignment: "unassigned" }) : {};
-    const leadParams = new URLSearchParams({ limit: String(state.lrmLeadPageSize || 25), page: String(state.lrmLeadPage || 1) });
+    const isFullLrmLeadManagement = state.user?.userType === "lrm_tl" && state.view === "lead-management";
+    const leadFilter = state.user?.userType === "lrm_tl" && !isFullLrmLeadManagement ? (state.lrmLeadFilter || { assignment: "unassigned" }) : {};
+    const leadParams = new URLSearchParams({ limit: isFullLrmLeadManagement ? "5000" : String(state.lrmLeadPageSize || 25), page: "1" });
     if (leadFilter.assignment) leadParams.set("assignment", leadFilter.assignment);
     if (leadFilter.status) leadParams.set("lrmStatus", leadFilter.status);
     if (leadFilter.lrmId) leadParams.set("lrmAssignedToUserId", leadFilter.lrmId);
@@ -324,7 +325,7 @@ function renderShell(content) {
     : [["dashboard", "LRM Dashboard"], ["leads", "My Leads"], ["performance", "My Performance"], ["report", "Day-End Report"]];
   const accessLabel = isAdmin() ? "Admin full access" : state.user?.userType === "sc" ? "SC workspace" : state.user?.userType === "lrm_tl" ? "LRM Team Lead workspace" : "LRM workspace";
   app.innerHTML = `<div class="shell"><aside class="side"><div class="brand"><div class="mark"></div><div>Zen Grid Solar<div class="sub">${esc(state.user?.firstName || "User")} / ${accessLabel}</div></div></div><div class="nav">${nav.map(([id, label]) => `<button class="${state.view === id ? "active" : ""}" data-view="${id}">${label}</button>`).join("")}</div><button class="btn danger" style="margin-top:20px;width:100%" id="logout">Logout</button></aside><main class="main">${content}</main></div>`;
-  document.querySelectorAll("[data-view]").forEach((b) => b.onclick = () => { state.view = b.dataset.view; render(); });
+  document.querySelectorAll("[data-view]").forEach((b) => b.onclick = () => { state.view = b.dataset.view; if (state.view === "lead-management") loadData(); else render(); });
   document.querySelector("#logout").onclick = () => { localStorage.clear(); Object.assign(state, { accessToken: "", user: null }); renderLogin(); };
 }
 
