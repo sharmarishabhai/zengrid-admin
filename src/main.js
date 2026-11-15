@@ -191,7 +191,8 @@ async function loadData() {
     state.user = me.user;
     const isFullLrmLeadManagement = state.user?.userType === "lrm_tl" && state.view === "lead-management";
     const leadFilter = state.user?.userType === "lrm_tl" && !isFullLrmLeadManagement ? (state.lrmLeadFilter || { assignment: "unassigned" }) : {};
-    const leadParams = new URLSearchParams({ limit: isFullLrmLeadManagement ? "5000" : String(state.lrmLeadPageSize || 25), page: "1" });
+    const fullPersonalLrm = state.user?.userType === "lrm";
+    const leadParams = new URLSearchParams({ limit: isFullLrmLeadManagement || fullPersonalLrm ? "5000" : String(state.lrmLeadPageSize || 25), page: "1" });
     if (leadFilter.assignment) leadParams.set("assignment", leadFilter.assignment);
     if (leadFilter.status) leadParams.set("lrmStatus", leadFilter.status);
     if (leadFilter.lrmId) leadParams.set("lrmAssignedToUserId", leadFilter.lrmId);
