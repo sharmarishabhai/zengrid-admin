@@ -602,6 +602,7 @@ function configForm(pageKey, c = {}) {
 }
 
 function performanceView() {
+  if (state.user?.userType === "lrm_tl") return lrmPerformanceView();
   const title = isAdmin() ? "Team Performance" : "My Performance";
   const subtitle = isAdmin() ? "Separate pages for SC and LRM performance, each with tile and table layouts." : "Your LRM call performance and SC outcomes for leads assigned by you.";
   const mode = state.perfMode || "tiles";
