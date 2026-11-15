@@ -47,6 +47,9 @@ const state = {
   pages: { leads: 1, quote: 1, payment: 1, gst: 1 },
   leadFilters: { q: "", leadStatus: "", source: "", assignedToUserId: "", assignedByUserId: "", meeting: "", meetingDateFrom: "", meetingDateTo: "", followUpDateFrom: "", followUpDateTo: "" },
   selectedLrmLeadIds: [],
+  lrmLeadPage: 1,
+  lrmLeadPageSize: 25,
+  lrmLeadFilter: { q: "", status: "", assignment: "unassigned", lrmId: "" },
 };
 
 const css = `
@@ -185,8 +188,8 @@ async function loadData() {
   try {
     const me = await api("/auth/me");
     state.user = me.user;
-    const leadFilter = state.user?.userType === "lrm_tl" ? (state.lrmLeadFilter || {}) : {};
-    const leadParams = new URLSearchParams({ limit: "25", page: String(state.lrmLeadPage || 1) });
+    const leadFilter = state.user?.userType === "lrm_tl" ? (state.lrmLeadFilter || { assignment: "unassigned" }) : {};
+    const leadParams = new URLSearchParams({ limit: String(state.lrmLeadPageSize || 25), page: String(state.lrmLeadPage || 1) });
     if (leadFilter.assignment) leadParams.set("assignment", leadFilter.assignment);
     if (leadFilter.status) leadParams.set("lrmStatus", leadFilter.status);
     if (leadFilter.lrmId) leadParams.set("lrmAssignedToUserId", leadFilter.lrmId);
@@ -217,6 +220,7 @@ async function loadData() {
     Object.assign(state, {
       summary: data[0].summary || {},
       leads: data[1].leads || [],
+      lrmLeadPagination: data[1].pagination || {},
       users: isAdmin() ? data[2].users || [] : [],
       lrms: isAdmin() ? data[3].users || [] : state.user?.userType === "lrm_tl" ? (data.find((x) => Array.isArray(x.users) && x.users.some((u) => u.userType === "lrm"))?.users || []) : [],
       scs: data[2 + offset].users || [],
@@ -245,8 +249,8 @@ async function loadData() {
 
 async function loadLrmLeadData() {
   if (!state.accessToken) return renderLogin();
-  const filter = state.lrmLeadFilter || {};
-  const params = new URLSearchParams({ limit: "25", page: String(state.lrmLeadPage || 1) });
+  const filter = state.lrmLeadFilter || { assignment: "unassigned" };
+  const params = new URLSearchParams({ limit: String(state.lrmLeadPageSize || 25), page: String(state.lrmLeadPage || 1) });
   if (filter.assignment) params.set("assignment", filter.assignment);
   if (filter.status) params.set("lrmStatus", filter.status);
   if (filter.lrmId) params.set("lrmAssignedToUserId", filter.lrmId);
@@ -896,6 +900,14 @@ function viewGstPdf(g) {
 
 function bind() {
   document.querySelector("#refresh")?.addEventListener("click", loadData);
+  const lrmToolbar = document.querySelector('[data-lrm-tab="unassigned"]')?.parentElement;
+  if (lrmToolbar && !document.querySelector("#lrmLeadPageSize")) {
+    const size = document.createElement("select");
+    size.id = "lrmLeadPageSize";
+    size.innerHTML = [25, 50, 100].map((n) => `<option value="${n}" ${Number(state.lrmLeadPageSize) === n ? "selected" : ""}>${n} per page</option>`).join("");
+    lrmToolbar.append(" ", size);
+    size.onchange = async () => { state.lrmLeadPageSize = Number(size.value); state.lrmLeadPage = 1; await loadLrmLeadData(); };
+  }
   document.querySelectorAll('[data-dashboard-action="leads"]').forEach((b) => b.addEventListener("click", () => { state.view = "leads"; render(); }));
   document.querySelectorAll("[data-dashboard-status]").forEach((b) => b.addEventListener("click", () => { state.view = "leads"; state.leadFilters.leadStatus = b.dataset.dashboardStatus; state.pages.leads = 1; render(); }));
   document.querySelector("#dashboardAddLead")?.addEventListener("click", () => modal("Add Lead", leadForm(), (data) => api("/leads", { method: "POST", body: JSON.stringify(data) })));
