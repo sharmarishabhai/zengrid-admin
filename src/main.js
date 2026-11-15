@@ -47,6 +47,7 @@ const state = {
   pages: { leads: 1, quote: 1, payment: 1, gst: 1 },
   leadFilters: { q: "", leadStatus: "", source: "", assignedToUserId: "", assignedByUserId: "", meeting: "", meetingDateFrom: "", meetingDateTo: "", followUpDateFrom: "", followUpDateTo: "" },
   selectedLrmLeadIds: [],
+  reportDateFilter: new Date().toISOString().slice(0, 10),
   lrmLeadPage: 1,
   lrmLeadPageSize: 25,
   lrmLeadFilter: { q: "", status: "", assignment: "unassigned", lrmId: "" },
@@ -204,7 +205,7 @@ async function loadData() {
       api("/activities/meetings"),
       api("/followups"),
       canLoadLrmResources ? api("/activities/performance") : Promise.resolve({ sc: [], lrm: [] }),
-      canLoadLrmResources ? api("/activities/daily-reports") : Promise.resolve({ reports: [] })
+      canLoadLrmResources ? api(`/activities/daily-reports?reportDate=${encodeURIComponent(state.reportDateFilter || new Date().toISOString().slice(0, 10))}`) : Promise.resolve({ reports: [] })
     );
     // Plant locations are only available to admins and SCs. Do not let the
     // forbidden LRM request reject Promise.all and blank the whole account.
@@ -664,10 +665,16 @@ function lrmPerformanceView() {
   ${mode === "tiles" ? performanceTiles(rows, ["totalCalls", "connectedCalls", "meetingsScheduled", "meetingsDone", "ordersClosed", "conversionPercentage"], "lrm") : performanceTable(rows, ["name", "totalCalls", "connectedCalls", "meetingsScheduled", "meetingsDone", "ordersClosed", "conversionPercentage"])}`;
 }
 
+async function loadReportsForDate() {
+  const date = state.reportDateFilter || new Date().toISOString().slice(0, 10);
+  try { const data = await api(`/activities/daily-reports?reportDate=${encodeURIComponent(date)}`); state.reports = data.reports || []; render(); } catch (e) { toast(e.message); }
+}
+
 function reportView() {
-  const date = state.reportDateFilter || "";
-  const reports = state.reports.filter((r) => !date || r.reportDate === date);
-  return `${top("Reports", "Submit your report and review day-by-day reports from your assigned LRMs.", `<button class="btn primary" id="addReport">Submit Report</button>`)}<div class="card"><div class="toolbar" style="margin:0"><div class="field"><label>Report date</label><input type="date" id="reportDateFilter" value="${esc(date)}"></div><button class="btn" id="clearReportDate">All dates</button></div></div><div class="card"><h3>Team Reports</h3>${recordTable(reports, ["reportDate", "lrmName", "totalCalls", "connectedCalls", "meetingsScheduled", "meetingsDone", "ordersClosed"])}</div>`;
+  const date = state.reportDateFilter || new Date().toISOString().slice(0, 10);
+  const reports = state.reports.filter((r) => r.reportDate === date);
+  const sum = reports.reduce((a, r) => ({ totalCalls: a.totalCalls + Number(r.totalCalls || 0), connectedCalls: a.connectedCalls + Number(r.connectedCalls || 0), meetingsScheduled: a.meetingsScheduled + Number(r.meetingsScheduled || 0), meetingsDone: a.meetingsDone + Number(r.meetingsDone || 0), ordersClosed: a.ordersClosed + Number(r.ordersClosed || 0) }), { totalCalls: 0, connectedCalls: 0, meetingsScheduled: 0, meetingsDone: 0, ordersClosed: 0 });
+  return `${top("Reports", "Submit your report and review your LRM team day by day.", `<button class="btn primary" id="addReport">Submit Report</button>`)}<div class="card"><div class="toolbar" style="margin:0"><div class="field"><label>Select report date</label><input type="date" id="reportDateFilter" value="${esc(date)}"></div><button class="btn primary" id="searchReports">Search</button></div><div class="muted" style="margin-top:8px">Selected date: ${esc(date)}</div></div><div class="stats">${[["LRMs reported", reports.length], ["Total calls", sum.totalCalls], ["Connected", sum.connectedCalls], ["Meetings", sum.meetingsScheduled], ["Closed", sum.ordersClosed]].map(([k,v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("")}</div><div class="card"><h3>LRM reports for ${esc(date)}</h3>${recordTable(reports, ["reportDate", "lrmName", "totalCalls", "connectedCalls", "meetingsScheduled", "meetingsDone", "ordersClosed", "note"])}</div>`;
 }
 
 function reportForm(r = {}) {
@@ -984,8 +991,7 @@ function bind() {
     modal(`Edit ${configPages[pageKey].label}`, configForm(pageKey, c), (data) => api(`/config/${pageKey}/${c._id}`, { method: "PATCH", body: JSON.stringify(data) }));
   });
   document.querySelector("#addReport")?.addEventListener("click", () => modal("Day-End Report", reportForm(), (data) => api("/activities/daily-reports", { method: "POST", body: JSON.stringify(data) })));
-  document.querySelector("#reportDateFilter")?.addEventListener("change", (e) => { state.reportDateFilter = e.target.value; render(); });
-  document.querySelector("#clearReportDate")?.addEventListener("click", () => { state.reportDateFilter = ""; render(); });
+  document.querySelector("#searchReports")?.addEventListener("click", async () => { state.reportDateFilter = document.querySelector("#reportDateFilter")?.value || new Date().toISOString().slice(0, 10); await loadReportsForDate(); });
   document.querySelector("#addPlant")?.addEventListener("click", () => modal("Add Plant Location", plantForm(), (data) => api("/plants", { method: "POST", body: JSON.stringify(data) })));
   document.querySelectorAll("[data-edit-plant]").forEach((b) => b.onclick = () => { const p = state.plants.find((x) => x._id === b.dataset.editPlant); modal("Edit Plant Location", plantForm(p), (data) => api("/plants", { method: "POST", body: JSON.stringify(data) })); });
   document.querySelectorAll("[data-delete-plant]").forEach((b) => b.onclick = async () => { if (!confirm("Delete this plant location?")) return; try { await api(`/plants/${b.dataset.deletePlant}`, { method: "DELETE" }); await loadData(); } catch (e) { toast(e.message); } });
