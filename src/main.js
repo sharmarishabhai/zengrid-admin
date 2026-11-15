@@ -515,7 +515,7 @@ function leadsView() {
 }
 
 function lrmTeamLeadLeadsView() {
-  const statuses = ["New Lead", "Call Back", "Hot", "Average", "Cold", "Junk", "Won"];
+  const statuses = [];
   const selected = new Set(state.selectedLrmLeadIds);
   const filter = state.lrmLeadFilter || { q: "", status: "", assignment: "", lrmId: "" };
   const q = String(filter.q || "").toLowerCase();
@@ -648,8 +648,9 @@ function lrmPerformanceView() {
 }
 
 function reportView() {
-  return `${top("Day-End Report", "Enter total calls, connected calls, meetings scheduled, meetings done and orders closed.", `<button class="btn primary" id="addReport">Add Today Report</button>`)}
-  <div class="card"><h3>Recent LRM Reports</h3>${recordTable(state.reports, ["reportDate", "totalCalls", "connectedCalls", "meetingsScheduled", "meetingsDone", "ordersClosed"])}</div>`;
+  const date = state.reportDateFilter || "";
+  const reports = state.reports.filter((r) => !date || r.reportDate === date);
+  return `${top("Reports", "Submit your report and review day-by-day reports from your assigned LRMs.", `<button class="btn primary" id="addReport">Submit Report</button>`)}<div class="card"><div class="toolbar" style="margin:0"><div class="field"><label>Report date</label><input type="date" id="reportDateFilter" value="${esc(date)}"></div><button class="btn" id="clearReportDate">All dates</button></div></div><div class="card"><h3>Team Reports</h3>${recordTable(reports, ["reportDate", "lrmName", "totalCalls", "connectedCalls", "meetingsScheduled", "meetingsDone", "ordersClosed"])}</div>`;
 }
 
 function reportForm(r = {}) {
@@ -958,6 +959,8 @@ function bind() {
     modal(`Edit ${configPages[pageKey].label}`, configForm(pageKey, c), (data) => api(`/config/${pageKey}/${c._id}`, { method: "PATCH", body: JSON.stringify(data) }));
   });
   document.querySelector("#addReport")?.addEventListener("click", () => modal("Day-End Report", reportForm(), (data) => api("/activities/daily-reports", { method: "POST", body: JSON.stringify(data) })));
+  document.querySelector("#reportDateFilter")?.addEventListener("change", (e) => { state.reportDateFilter = e.target.value; render(); });
+  document.querySelector("#clearReportDate")?.addEventListener("click", () => { state.reportDateFilter = ""; render(); });
   document.querySelector("#addPlant")?.addEventListener("click", () => modal("Add Plant Location", plantForm(), (data) => api("/plants", { method: "POST", body: JSON.stringify(data) })));
   document.querySelectorAll("[data-edit-plant]").forEach((b) => b.onclick = () => { const p = state.plants.find((x) => x._id === b.dataset.editPlant); modal("Edit Plant Location", plantForm(p), (data) => api("/plants", { method: "POST", body: JSON.stringify(data) })); });
   document.querySelectorAll("[data-delete-plant]").forEach((b) => b.onclick = async () => { if (!confirm("Delete this plant location?")) return; try { await api(`/plants/${b.dataset.deletePlant}`, { method: "DELETE" }); await loadData(); } catch (e) { toast(e.message); } });
