@@ -383,7 +383,8 @@ function lrmDashboardView() {
   const s = state.summary;
   const connected = state.reports.reduce((sum, r) => sum + Number(r.connectedCalls || 0), 0);
   const calls = state.reports.reduce((sum, r) => sum + Number(r.totalCalls || 0), 0);
-  const conversion = connected ? Math.round(((s.won || 0) / connected) * 100) : 0;
+  const performanceRow = (state.performance.lrm || []).find((row) => String(row.userId || "") === String(state.user?._id || "")) || (state.performance.lrm || [])[0];
+  const conversion = performanceRow ? Number(performanceRow.conversionPercentage || 0) : connected ? Math.round(((s.won || 0) / connected) * 100) : 0;
   const recent = state.leads.slice(0, 5);
   const teamLead = state.user?.userType === "lrm_tl";
   return `${top(teamLead ? "LRM Team Lead Dashboard" : "LRM Dashboard", teamLead ? "Manage your team’s leads, quality and assignments." : "Your leads, calls, scheduled meetings and closures.")}
