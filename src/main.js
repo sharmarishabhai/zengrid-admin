@@ -959,12 +959,12 @@ function bind() {
     modal("Assign selected leads to LRM", `<div class="field"><label>LRM</label><select name="lrmUserId" required><option value="">Select LRM</option>${options}</select></div>`, async (data) => { const result = await api("/leads/lrm-assign", { method: "PATCH", body: JSON.stringify({ leadIds: state.selectedLrmLeadIds, lrmUserId: data.lrmUserId }) }); state.selectedLrmLeadIds = []; await loadData(); return result; });
   });
   document.querySelector("#downloadLeadSample")?.addEventListener("click", () => {
-    const csv = "customerName,phone,whatsappNumber,email,address,area,locality,monthlyBill,source\nRahul Sharma,9876543210,9876543210,rahul@example.com,Lucknow,Aliganj,Lucknow,2500,Import\n";
+    const csv = "Name,Phone Number\nRahul Sharma,9876543210\n";
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); a.download = "zengrid-leads-sample.csv"; a.click(); URL.revokeObjectURL(a.href);
   });
   document.querySelector("#importLeads")?.addEventListener("click", () => {
     const input = document.createElement("input"); input.type = "file"; input.accept = ".csv";
-    input.onchange = async () => { const file = input.files?.[0]; if (!file) return; const lines = (await file.text()).trim().split(/\r?\n/); const headers = lines.shift().split(",").map((x) => x.trim()); const leads = lines.filter(Boolean).map((line) => { const values = line.split(","); return headers.reduce((o, h, i) => { o[h] = (values[i] || "").trim(); return o; }, {}); }); await api("/leads/import", { method: "POST", body: JSON.stringify({ leads }) }); };
+    input.onchange = async () => { const file = input.files?.[0]; if (!file) return; const lines = (await file.text()).trim().split(/\r?\n/); lines.shift(); const leads = lines.filter(Boolean).map((line) => { const [customerName, phone] = line.split(","); return { customerName: (customerName || "").trim(), phone: (phone || "").trim() }; }); await api("/leads/import", { method: "POST", body: JSON.stringify({ leads }) }); };
     input.click();
   });
   document.querySelectorAll("[data-lead-open]").forEach((row) => {
