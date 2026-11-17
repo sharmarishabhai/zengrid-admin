@@ -50,6 +50,7 @@ const state = {
   selectedLrmLeadIds: [],
   reportDateFilter: new Date().toISOString().slice(0, 10),
   performanceMonth: new Date().toISOString().slice(0, 7),
+  performancePeriod: "month",
   lrmLeadPage: 1,
   lrmLeadPageSize: 25,
   lrmLeadFilter: { q: "", status: "", assignment: "unassigned", lrmId: "" },
@@ -208,7 +209,7 @@ async function loadData() {
     baseCalls.push(
       api("/activities/meetings"),
       api("/followups"),
-      canLoadLrmResources ? api(`/activities/performance?month=${encodeURIComponent(state.performanceMonth || new Date().toISOString().slice(0, 7))}`) : Promise.resolve({ sc: [], lrm: [] }),
+      canLoadLrmResources ? api(`/activities/performance?${state.performancePeriod === "all" ? "period=all" : `month=${encodeURIComponent(state.performanceMonth || new Date().toISOString().slice(0, 7))}`}`) : Promise.resolve({ sc: [], lrm: [] }),
       canLoadLrmResources ? api(`/activities/daily-reports?reportDate=${encodeURIComponent(state.reportDateFilter || new Date().toISOString().slice(0, 10))}`) : Promise.resolve({ reports: [] })
     );
     // Plant locations are only available to admins and SCs. Do not let the
@@ -341,7 +342,7 @@ function performanceTiles(rows, keys, type) {
   if (type === "lrm") return `<div class="grid two" style="grid-template-columns:repeat(auto-fit,minmax(255px,1fr));gap:14px">${rows.map((row, index) => {
     const metrics = [["Meetings Scheduled", row.meetingsScheduled, "#f5a623"], ["Meetings Done", row.meetingsDone, "#8fa57f"], ["Orders Closed", row.ordersClosed, "#1c9a63"]];
     const conversion = Number(row.conversionPercentage || 0);
-    return `<div class="card" style="padding:16px;border-radius:14px;background:linear-gradient(145deg,#fff 0%,#faf7ff 100%);border:1px solid #e5deef;box-shadow:0 8px 20px rgba(76,17,143,.09);animation:zgDashRise .35s ease ${index * 45}ms both"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><div class="lead-head" style="align-items:center"><div class="avatar">${esc((row.name || "?").slice(0, 1).toUpperCase())}</div><div><div class="lead-name">${esc(row.name || "-")}</div><div class="muted">${row.role === "lrm_tl" ? "LRM Team Lead" : "Lead Relationship Manager"}</div></div></div><span class="pill ${conversion ? "pgreen" : "pblue"}" style="white-space:nowrap">${conversion}% conv.</span></div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:16px">${metrics.map(([label, value, color]) => `<div style="text-align:center;padding:10px 5px;border-radius:10px;background:#fff;border-top:3px solid ${color}"><b style="display:block;font-size:22px;color:${color}">${Number(value || 0)}</b><span style="display:block;margin-top:5px;font-size:10px;color:#6c6675;font-weight:800;line-height:1.15">${label}</span></div>`).join("")}</div></div>`;
+    return `<div class="card" style="padding:16px;border-radius:14px;background:linear-gradient(145deg,#fff 0%,#faf7ff 100%);border:1px solid #e5deef;box-shadow:0 8px 20px rgba(76,17,143,.09);animation:zgDashRise .35s ease ${index * 45}ms both"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><div class="lead-head" style="align-items:center"><div class="avatar">${esc((row.name || "?").slice(0, 1).toUpperCase())}</div><div><div class="lead-name">${esc(row.name || "-")}</div><div class="muted">${row.role === "lrm_tl" ? "LRM Team Lead" : "Lead Relationship Manager"}</div></div></div><span class="pill ${conversion ? "pgreen" : "pblue"}" style="white-space:nowrap">${conversion}% conv.</span></div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:16px">${metrics.map(([label, value, color]) => `<div style="text-align:center;padding:10px 5px;border-radius:10px;background:#fff;border-top:3px solid ${color}"><b style="display:block;font-size:22px;color:${color}">${Number(value || 0)}</b><span style="display:block;margin-top:5px;font-size:10px;color:#6c6675;font-weight:800;line-height:1.15">${label}</span></div>`).join("")}</div><button class="btn compact" data-set-target="${esc(row.userId || "")}" style="width:100%;margin-top:12px">Set Performance Target</button></div>`;
   }).join("")}</div>`;
   return `<div class="grid two">${rows.map((row) => `<div class="card"><div class="lead-head" style="align-items:flex-start"><div class="avatar">${esc((row.name || "?").slice(0, 1).toUpperCase())}</div><div><div class="lead-name">${esc(row.name || "-")}</div><div class="muted">${type === "sc" ? "Sales Counselor" : row.role === "lrm_tl" ? "LRM Team Lead" : "Lead Relationship Manager"}</div></div></div><div class="grid two" style="margin-top:14px">${keys.map((k) => `<div class="mini-stat"><span class="k">${k}</span><b>${esc(String(row[k] ?? 0))}</b></div>`).join("")}</div></div>`).join("")}</div>`;
 }
@@ -640,7 +641,7 @@ function performanceView() {
 }
 
 function performanceMonthControls() {
-  return `<div class="toolbar"><label style="font-size:11px;font-weight:800">Month <input type="month" id="performanceMonth" value="${esc(state.performanceMonth || new Date().toISOString().slice(0, 7))}"></label><button class="btn primary" id="searchPerformance">Apply</button></div>`;
+  return `<div class="toolbar"><button class="btn ${state.performancePeriod === "all" ? "primary" : ""}" data-performance-period="all">All Time</button><button class="btn ${state.performancePeriod === "month" && state.performanceMonth === new Date().toISOString().slice(0, 7) ? "primary" : ""}" data-performance-period="this">This Month</button><button class="btn ${state.performancePeriod === "month" && state.performanceMonth !== new Date().toISOString().slice(0, 7) ? "primary" : ""}" data-performance-period="last">Last Month</button><label style="font-size:11px;font-weight:800">Month <input type="month" id="performanceMonth" value="${esc(state.performanceMonth || new Date().toISOString().slice(0, 7))}"></label><button class="btn primary" id="searchPerformance">Apply</button></div>`;
 }
 
 function performanceShell() {
@@ -946,6 +947,8 @@ function bind() {
   });
   document.querySelectorAll("[data-perf-mode]").forEach((b) => b.onclick = () => { state.perfMode = b.dataset.perfMode; render(); });
   document.querySelector("#searchPerformance")?.addEventListener("click", () => { state.performanceMonth = document.querySelector("#performanceMonth")?.value || new Date().toISOString().slice(0, 7); loadData(); });
+  document.querySelectorAll("[data-performance-period]").forEach((b) => b.onclick = () => { const now = new Date(); state.performancePeriod = b.dataset.performancePeriod === "all" ? "all" : "month"; if (b.dataset.performancePeriod === "this") state.performanceMonth = now.toISOString().slice(0, 7); if (b.dataset.performancePeriod === "last") { now.setMonth(now.getMonth() - 1); state.performanceMonth = now.toISOString().slice(0, 7); } loadData(); });
+  document.querySelectorAll("[data-set-target]").forEach((b) => b.onclick = async () => { const values = {}; [["totalCalls", "Total Calls"], ["meetingsScheduled", "Meetings Scheduled"], ["meetingsDone", "Meetings Done"], ["ordersClosed", "Orders Closed"]].forEach(([key, label]) => { values[key] = Number(window.prompt(`${label} target`, "0") || 0); }); try { await api(`/users/${b.dataset.setTarget}/performance-target`, { method: "PATCH", body: JSON.stringify(values) }); toast("Target saved"); } catch (e) { toast(e.message); } });
   document.querySelectorAll("[data-lead-filter]").forEach((el) => {
     el.addEventListener("change", () => { state.leadFilters[el.dataset.leadFilter] = el.value; state.pages.leads = 1; render(); });
   });
