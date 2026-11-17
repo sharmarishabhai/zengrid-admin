@@ -49,6 +49,7 @@ const state = {
   leadFilters: { q: "", leadStatus: "", source: "", assignedToUserId: "", assignedByUserId: "", meeting: "", meetingDateFrom: "", meetingDateTo: "", followUpDateFrom: "", followUpDateTo: "" },
   selectedLrmLeadIds: [],
   reportDateFilter: new Date().toISOString().slice(0, 10),
+  performanceMonth: new Date().toISOString().slice(0, 7),
   lrmLeadPage: 1,
   lrmLeadPageSize: 25,
   lrmLeadFilter: { q: "", status: "", assignment: "unassigned", lrmId: "" },
@@ -207,7 +208,7 @@ async function loadData() {
     baseCalls.push(
       api("/activities/meetings"),
       api("/followups"),
-      canLoadLrmResources ? api("/activities/performance") : Promise.resolve({ sc: [], lrm: [] }),
+      canLoadLrmResources ? api(`/activities/performance?month=${encodeURIComponent(state.performanceMonth || new Date().toISOString().slice(0, 7))}`) : Promise.resolve({ sc: [], lrm: [] }),
       canLoadLrmResources ? api(`/activities/daily-reports?reportDate=${encodeURIComponent(state.reportDateFilter || new Date().toISOString().slice(0, 10))}`) : Promise.resolve({ reports: [] })
     );
     // Plant locations are only available to admins and SCs. Do not let the
@@ -625,12 +626,14 @@ function performanceView() {
   const title = isAdmin() ? "Team Performance" : "My Performance";
   const subtitle = isAdmin() ? "Separate pages for SC and LRM performance, each with current-month meeting and closure metrics." : "Your current-month LRM call performance, meetings done and orders closed.";
   const mode = state.perfMode || "tiles";
-  const controls = isAdmin()
-    ? `<div class="subnav"><button class="${mode === "tiles" ? "active" : ""}" data-perf-mode="tiles">Tiles</button><button class="${mode === "table" ? "active" : ""}" data-perf-mode="table">Table</button></div>`
-    : "";
+  const controls = `${performanceMonthControls()}${isAdmin() ? `<div class="subnav"><button class="${mode === "tiles" ? "active" : ""}" data-perf-mode="tiles">Tiles</button><button class="${mode === "table" ? "active" : ""}" data-perf-mode="table">Table</button></div>` : ""}`;
   return `${top(title, subtitle, controls)}
   <div class="subnav">${isAdmin() ? `<button class="${state.view === "performance-sc" ? "active" : ""}" data-view="performance-sc">SC Performance</button><button class="${state.view === "performance-lrm" ? "active" : ""}" data-view="performance-lrm">LRM Performance</button>` : ""}</div>
   ${isAdmin() ? performanceShell() : lrmPerformanceShell()}`;
+}
+
+function performanceMonthControls() {
+  return `<div class="toolbar"><label style="font-size:11px;font-weight:800">Month <input type="month" id="performanceMonth" value="${esc(state.performanceMonth || new Date().toISOString().slice(0, 7))}"></label><button class="btn primary" id="searchPerformance">Apply</button></div>`;
 }
 
 function performanceShell() {
@@ -656,7 +659,7 @@ function lrmPerformanceShell() {
 function scPerformanceView() {
   const rows = state.performance.sc || [];
   const mode = state.perfMode || "tiles";
-  return `${top("SC Performance", "Current-month SC meetings done and orders closed with tile and table views.", `<div class="subnav"><button class="${mode === "tiles" ? "active" : ""}" data-perf-mode="tiles">Tiles</button><button class="${mode === "table" ? "active" : ""}" data-perf-mode="table">Table</button></div>`) }
+  return `${top("SC Performance", "Performance for the selected month: meetings done and orders closed.", `${performanceMonthControls()}<div class="subnav"><button class="${mode === "tiles" ? "active" : ""}" data-perf-mode="tiles">Tiles</button><button class="${mode === "table" ? "active" : ""}" data-perf-mode="table">Table</button></div>`) }
   ${mode === "tiles" ? performanceTiles(rows, ["totalAssigned", "meetingsDone", "ordersClosed", "conversionPercentage"], "sc") : performanceTable(rows, ["name", "totalAssigned", "meetingsDone", "ordersClosed", "conversionPercentage"])}`;
 }
 
@@ -665,7 +668,7 @@ function lrmPerformanceView() {
   const mode = state.perfMode || "tiles";
   const title = state.user?.userType === "lrm_tl" ? "Team Performance" : "LRM Performance";
   const subtitle = state.user?.userType === "lrm_tl" ? "Current-month performance of you and all LRMs assigned to your team." : "Current-month LRM performance with meetings done and orders closed.";
-  return `${top(title, subtitle, `<div class="subnav"><button class="${mode === "tiles" ? "active" : ""}" data-perf-mode="tiles">Tiles</button><button class="${mode === "table" ? "active" : ""}" data-perf-mode="table">Table</button></div>`) }
+  return `${top(title, subtitle, `${performanceMonthControls()}<div class="subnav"><button class="${mode === "tiles" ? "active" : ""}" data-perf-mode="tiles">Tiles</button><button class="${mode === "table" ? "active" : ""}" data-perf-mode="table">Table</button></div>`) }
   ${mode === "tiles" ? performanceTiles(rows, ["totalCalls", "connectedCalls", "meetingsScheduled", "meetingsDone", "ordersClosed", "conversionPercentage"], "lrm") : performanceTable(rows, ["name", "totalCalls", "connectedCalls", "meetingsScheduled", "meetingsDone", "ordersClosed", "conversionPercentage"])}`;
 }
 
@@ -935,6 +938,7 @@ function bind() {
     render();
   });
   document.querySelectorAll("[data-perf-mode]").forEach((b) => b.onclick = () => { state.perfMode = b.dataset.perfMode; render(); });
+  document.querySelector("#searchPerformance")?.addEventListener("click", () => { state.performanceMonth = document.querySelector("#performanceMonth")?.value || new Date().toISOString().slice(0, 7); loadData(); });
   document.querySelectorAll("[data-lead-filter]").forEach((el) => {
     el.addEventListener("change", () => { state.leadFilters[el.dataset.leadFilter] = el.value; state.pages.leads = 1; render(); });
   });
