@@ -623,7 +623,7 @@ function configForm(pageKey, c = {}) {
 function performanceView() {
   if (state.user?.userType === "lrm_tl") return lrmPerformanceView();
   const title = isAdmin() ? "Team Performance" : "My Performance";
-  const subtitle = isAdmin() ? "Separate pages for SC and LRM performance, each with tile and table layouts." : "Your LRM call performance and SC outcomes for leads assigned by you.";
+  const subtitle = isAdmin() ? "Separate pages for SC and LRM performance, each with current-month meeting and closure metrics." : "Your current-month LRM call performance, meetings done and orders closed.";
   const mode = state.perfMode || "tiles";
   const controls = isAdmin()
     ? `<div class="subnav"><button class="${mode === "tiles" ? "active" : ""}" data-perf-mode="tiles">Tiles</button><button class="${mode === "table" ? "active" : ""}" data-perf-mode="table">Table</button></div>`
@@ -656,7 +656,7 @@ function lrmPerformanceShell() {
 function scPerformanceView() {
   const rows = state.performance.sc || [];
   const mode = state.perfMode || "tiles";
-  return `${top("SC Performance", "Dedicated SC performance page with tile and table views.", `<div class="subnav"><button class="${mode === "tiles" ? "active" : ""}" data-perf-mode="tiles">Tiles</button><button class="${mode === "table" ? "active" : ""}" data-perf-mode="table">Table</button></div>`) }
+  return `${top("SC Performance", "Current-month SC meetings done and orders closed with tile and table views.", `<div class="subnav"><button class="${mode === "tiles" ? "active" : ""}" data-perf-mode="tiles">Tiles</button><button class="${mode === "table" ? "active" : ""}" data-perf-mode="table">Table</button></div>`) }
   ${mode === "tiles" ? performanceTiles(rows, ["totalAssigned", "meetingsDone", "ordersClosed", "conversionPercentage"], "sc") : performanceTable(rows, ["name", "totalAssigned", "meetingsDone", "ordersClosed", "conversionPercentage"])}`;
 }
 
@@ -664,7 +664,7 @@ function lrmPerformanceView() {
   const rows = state.performance.lrm || [];
   const mode = state.perfMode || "tiles";
   const title = state.user?.userType === "lrm_tl" ? "Team Performance" : "LRM Performance";
-  const subtitle = state.user?.userType === "lrm_tl" ? "Performance of you and all LRMs assigned to your team." : "Dedicated LRM performance page with tile and table views.";
+  const subtitle = state.user?.userType === "lrm_tl" ? "Current-month performance of you and all LRMs assigned to your team." : "Current-month LRM performance with meetings done and orders closed.";
   return `${top(title, subtitle, `<div class="subnav"><button class="${mode === "tiles" ? "active" : ""}" data-perf-mode="tiles">Tiles</button><button class="${mode === "table" ? "active" : ""}" data-perf-mode="table">Table</button></div>`) }
   ${mode === "tiles" ? performanceTiles(rows, ["totalCalls", "connectedCalls", "meetingsScheduled", "meetingsDone", "ordersClosed", "conversionPercentage"], "lrm") : performanceTable(rows, ["name", "totalCalls", "connectedCalls", "meetingsScheduled", "meetingsDone", "ordersClosed", "conversionPercentage"])}`;
 }
