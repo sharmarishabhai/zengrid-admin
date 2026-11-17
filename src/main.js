@@ -358,9 +358,8 @@ function dashboardVisuals() {
   const status = Object.entries(s.leadStatus || {});
   const total = Math.max(Number(s.totalLeads) || 0, 1);
   const won = Number(s.won) || 0;
-  const performanceRow = isLrm() ? (state.performance.lrm || []).find((row) => String(row.userId || "") === String(state.user?._id || "")) || (state.performance.lrm || [])[0] : null;
-  const visualWon = performanceRow ? Number(performanceRow.ordersClosed || 0) : won;
-  const conversion = performanceRow ? Number(performanceRow.conversionPercentage || 0) : Math.min(100, Math.round((won / total) * 100));
+  const visualWon = won;
+  const conversion = Math.min(100, Math.round((won / total) * 100));
   const colors = ["#4c118f", "#8fa57f", "#f5a623", "#2d8cff", "#d94f70", "#6b7280"];
   return `<style>@keyframes zgDashRise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}@keyframes zgDashSpin{from{transform:rotate(-90deg)}to{transform:rotate(0)}}.dashboard-visual{animation:zgDashRise .45s ease both}.dashboard-donut{width:132px;height:132px;border-radius:50%;background:conic-gradient(var(--brand) ${conversion}%,#eee8f8 0);display:grid;place-items:center;animation:zgDashSpin .8s ease both}.dashboard-donut:after{content:"";width:92px;height:92px;border-radius:50%;background:#fff}.dashboard-donut-label{position:absolute;text-align:center;z-index:1;font-weight:950;color:var(--brand)}.dashboard-bar{height:9px;border-radius:99px;background:#eee8f8;overflow:hidden}.dashboard-bar span{display:block;height:100%;border-radius:inherit;transform-origin:left;animation:zgDashBar .8s ease both}@keyframes zgDashBar{from{transform:scaleX(0)}}@media(max-width:600px){.dashboard-visual-grid{grid-template-columns:1fr!important}}</style><div class="grid two dashboard-visual-grid dashboard-visual" style="margin-top:14px;grid-template-columns:1fr 1.6fr"><div class="card dashboard-card"><h3>Conversion <span class="muted">${conversion}%</span></h3><div style="display:flex;justify-content:center;position:relative;margin:18px 0"><div class="dashboard-donut"></div><div class="dashboard-donut-label">${visualWon}<small style="display:block;font-size:10px;color:var(--muted)">closed</small></div></div></div><div class="card dashboard-card"><h3>Lead status <span class="muted">${s.totalLeads || 0} total</span></h3>${status.slice(0,6).map(([label,value],i)=>`<div style="margin:12px 0"><div style="display:flex;justify-content:space-between;font-weight:800;font-size:12px"><span>${esc(label)}</span><span>${value || 0}</span></div><div class="dashboard-bar"><span style="width:${Math.min(100,Math.round((Number(value)||0)/total*100))}%;background:${colors[i%colors.length]}"></span></div></div>`).join("") || `<div class="empty">No lead status data</div>`}</div></div>`;
 }
@@ -385,9 +384,8 @@ function lrmDashboardView() {
   const s = state.summary;
   const connected = state.reports.reduce((sum, r) => sum + Number(r.connectedCalls || 0), 0);
   const calls = state.reports.reduce((sum, r) => sum + Number(r.totalCalls || 0), 0);
-  const performanceRow = (state.performance.lrm || []).find((row) => String(row.userId || "") === String(state.user?._id || "")) || (state.performance.lrm || [])[0];
-  const conversion = performanceRow ? Number(performanceRow.conversionPercentage || 0) : connected ? Math.round(((s.won || 0) / connected) * 100) : 0;
-  const dashboardClosed = performanceRow ? Number(performanceRow.ordersClosed || 0) : Number(s.won || 0);
+  const conversion = s.totalLeads ? Math.round(((s.won || 0) / s.totalLeads) * 100) : 0;
+  const dashboardClosed = Number(s.won || 0);
   const recent = state.leads.slice(0, 5);
   const teamLead = state.user?.userType === "lrm_tl";
   return `${top(teamLead ? "LRM Team Lead Dashboard" : "LRM Dashboard", teamLead ? "Manage your team’s leads, quality and assignments." : "Your leads, calls, scheduled meetings and closures.")}
