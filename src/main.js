@@ -1,4 +1,23 @@
 import { renderQuoteDocument } from "./quote-template.js";
+import * as XLSX from "xlsx";
+
+function parseLeadImport(workbookData) {
+  const workbook = XLSX.read(workbookData, { type: "array", cellText: true, cellDates: false });
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false });
+  if (!rows.length) return [];
+
+  const headers = rows[0].map((value) => String(value).trim().toLowerCase());
+  const nameIndex = headers.findIndex((header) => /^(name|customer name|customer|lead name)$/.test(header));
+  const phoneIndex = headers.findIndex((header) => /^(phone|phone number|mobile|mobile number|contact|contact number)$/.test(header));
+  const fallbackNameIndex = nameIndex >= 0 ? nameIndex : 0;
+  const fallbackPhoneIndex = phoneIndex >= 0 ? phoneIndex : 1;
+
+  return rows.slice(1).map((row) => ({
+    customerName: String(row[fallbackNameIndex] ?? "").trim(),
+    phone: String(row[fallbackPhoneIndex] ?? "").trim(),
+  })).filter((lead) => lead.customerName || lead.phone);
+}
 
 const API_BASE = "https://zengridpwa-backend.onrender.com/api";
 const apiUrl = (path) => `${API_BASE}/${String(path).replace(/^\/+/, "")}`;
@@ -976,8 +995,20 @@ function bind() {
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); a.download = "zengrid-leads-sample.csv"; a.click(); URL.revokeObjectURL(a.href);
   });
   document.querySelector("#importLeads")?.addEventListener("click", () => {
-    const input = document.createElement("input"); input.type = "file"; input.accept = ".csv";
-    input.onchange = async () => { const file = input.files?.[0]; if (!file) return; const lines = (await file.text()).trim().split(/\r?\n/); lines.shift(); const leads = lines.filter(Boolean).map((line) => { const [customerName, phone] = line.split(","); return { customerName: (customerName || "").trim(), phone: (phone || "").trim() }; }); await api("/leads/import", { method: "POST", body: JSON.stringify({ leads }) }); };
+    const input = document.createElement("input"); input.type = "file"; input.accept = ".csv,.xlsx,.xls";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        const leads = parseLeadImport(await file.arrayBuffer());
+        if (!leads.length) throw new Error("No lead rows found. Use Name and Phone Number columns.");
+        const result = await api("/leads/import", { method: "POST", body: JSON.stringify({ leads }) });
+        toast(`Imported ${result.imported} leads${result.skipped ? `, skipped ${result.skipped} duplicates` : ""}`);
+        await loadData();
+      } catch (error) {
+        toast(`Import failed: ${error.message}`);
+      }
+    };
     input.click();
   });
   document.querySelectorAll("[data-lead-open]").forEach((row) => {
