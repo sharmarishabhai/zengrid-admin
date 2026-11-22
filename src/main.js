@@ -347,7 +347,7 @@ function infoModal(title, body) {
 
 function renderShell(content) {
   const nav = isAdmin()
-    ? [["dashboard", "Admin Dashboard"], ["leads", "Lead Management"], ["plants", "Plant Locations"], ["maintenance", "Maintenance & Cleaning"], ["team", "Team"], ["performance-sc", "SC Performance"], ["performance-lrm", "LRM Performance"], ["configuration", "Configuration"], ["records", "Records"]]
+    ? [["dashboard", "Admin Dashboard"], ["leads", "Lead Management"], ["fresh-leads", "Fresh Leads"], ["plants", "Plant Locations"], ["maintenance", "Maintenance & Cleaning"], ["team", "Team"], ["performance-sc", "SC Performance"], ["performance-lrm", "LRM Performance"], ["configuration", "Configuration"], ["records", "Records"]]
     : state.user?.userType === "sc"
     ? [["dashboard", "SC Dashboard"], ["leads", "My Leads"], ["records", "Records"]]
     : state.user?.userType === "lrm_tl"
@@ -356,7 +356,7 @@ function renderShell(content) {
   const accessLabel = isAdmin() ? "Admin full access" : state.user?.userType === "sc" ? "SC workspace" : state.user?.userType === "lrm_tl" ? "LRM Team Lead workspace" : "LRM workspace";
   const sidebarStatusFilter = !isAdmin() && state.user?.userType !== "lrm_tl" ? `<div class="field" style="margin:10px 4px 0"><label style="color:#d9e2d2">Lead status</label><select id="sidebarLeadStatus" style="background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.25)"><option value="" style="background:#fff;color:#241a30">All statuses</option>${lrmLeadStatuses.map((s) => `<option value="${esc(s)}" style="background:#fff;color:#241a30" ${state.leadFilters.lrmStatus === s ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></div>` : "";
   app.innerHTML = `<div class="shell"><aside class="side"><div class="brand"><div class="mark"></div><div>Zen Grid Solar<div class="sub">${esc(state.user?.firstName || "User")} / ${accessLabel}</div></div></div><div class="nav">${nav.map(([id, label]) => `<button class="${state.view === id ? "active" : ""}" data-view="${id}">${label}</button>`).join("")}${sidebarStatusFilter}</div><button class="btn danger" style="margin-top:20px;width:100%" id="logout">Logout</button></aside><main class="main">${content}</main></div>`;
-  document.querySelectorAll("[data-view]").forEach((b) => b.onclick = () => { state.view = b.dataset.view; render(); if (state.view === "lead-management") loadData(); });
+  document.querySelectorAll("[data-view]").forEach((b) => b.onclick = () => { state.view = b.dataset.view; render(); if (["lead-management", "fresh-leads"].includes(state.view)) loadData(); });
   document.querySelector("#sidebarLeadStatus")?.addEventListener("change", (e) => { state.leadFilters.lrmStatus = e.target.value; state.view = "leads"; state.pages.leads = 1; render(); });
   document.querySelector("#logout").onclick = () => { localStorage.clear(); Object.assign(state, { accessToken: "", user: null }); renderLogin(); };
 }
@@ -550,7 +550,8 @@ function leadRows(rows = state.leads) {
 function leadsView() {
   if (state.user?.userType === "lrm_tl" && state.view !== "lead-management") return lrmTeamLeadLeadsView();
   const f = state.leadFilters;
-  const filtered = state.leads.filter((l) => {
+  const leadPool = state.view === "fresh-leads" ? state.leads.filter((l) => !l.assignedToUserId && !l.lrmAssignedToUserId && !l.assignedByUserId) : state.leads;
+  const filtered = leadPool.filter((l) => {
     const q = f.q.toLowerCase();
     const hay = [l.customerName, l.leadId, l.phone, l.whatsappNumber, l.email, l.area, l.locality].join(" ").toLowerCase();
     const meetingDate = l.meetingDate || ""; const followDate = l.followUpDate || "";
@@ -564,7 +565,7 @@ function leadsView() {
   const select = (name, value, options, label) => `<div class="field"><label>${label}</label><select data-lead-filter="${name}"><option value="">All ${label}</option>${options.map((x) => `<option value="${esc(x.value || x)}" ${String(value) === String(x.value || x) ? "selected" : ""}>${esc(x.label || x)}</option>`).join("")}</select></div>`;
   const activeFilters = Object.values(f).some(Boolean);
   const leadActions = state.user?.userType === "lrm" ? `<button class="btn primary" id="addLead">Add Lead</button>` : `<button class="btn" id="downloadLeadSample">Download sample</button><button class="btn" id="importLeads">Import leads</button><button class="btn primary" id="addLead">Add Lead</button>`;
-  return `${top("Lead Management", "Create, assign, update status, schedule follow-ups and generate records.", leadActions)}
+  return `${top(state.view === "fresh-leads" ? "Fresh Leads" : "Lead Management", state.view === "fresh-leads" ? "Unassigned leads ready for assignment." : "Create, assign, update status, schedule follow-ups and generate records.", leadActions)}
   <div class="lead-filters">
     <div class="mini-stat"><span class="k">Won</span><b>${won}</b></div>
     <div class="mini-stat"><span class="k">Follow Ups</span><b>${follow}</b></div>
@@ -1080,6 +1081,7 @@ function render() {
   const views = {
     dashboard: dashboardView,
     leads: leadsView,
+    "fresh-leads": leadsView,
     "lead-management": leadsView,
     plants: plantsView,
     team: teamView,
