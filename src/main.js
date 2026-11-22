@@ -62,6 +62,7 @@ const state = {
   performance: { sc: [], lrm: [] },
   reports: [],
   plants: [],
+  maintenance: { plants: [], tasks: [] },
   configPage: "system-sizes",
   perfMode: "tiles",
   pages: { leads: 1, quote: 1, payment: 1, gst: 1 },
@@ -236,6 +237,7 @@ async function loadData() {
     // Plant locations are only available to admins and SCs. Do not let the
     // forbidden LRM request reject Promise.all and blank the whole account.
     if (isAdmin() || state.user?.userType === "sc") baseCalls.push(api("/plants"));
+    if (isAdmin()) baseCalls.push(api("/maintenance/plants"), api("/maintenance/tasks"));
     if (isAdmin()) baseCalls.splice(2, 0, api("/users"), api("/users/lrms"));
     else if (state.user?.userType === "lrm_tl") baseCalls.push(api("/users/lrms"));
     const settled = await Promise.allSettled(baseCalls);
@@ -261,6 +263,7 @@ async function loadData() {
       performance: data[(canManageCommercialDocs() ? 9 : 6) + offset] || { sc: [], lrm: [] },
       reports: data[(canManageCommercialDocs() ? 10 : 7) + offset].reports || [],
       plants: isAdmin() || state.user?.userType === "sc" ? data[data.length - 1].plants || [] : [],
+      maintenance: isAdmin() ? { plants: data[data.length - 2].plants || [], tasks: data[data.length - 1].tasks || [] } : state.maintenance,
     });
     localStorage.setItem("zg_admin_user", JSON.stringify(state.user));
   } catch (e) {
@@ -343,7 +346,7 @@ function infoModal(title, body) {
 
 function renderShell(content) {
   const nav = isAdmin()
-    ? [["dashboard", "Admin Dashboard"], ["leads", "Lead Management"], ["plants", "Plant Locations"], ["team", "Team"], ["performance-sc", "SC Performance"], ["performance-lrm", "LRM Performance"], ["configuration", "Configuration"], ["records", "Records"]]
+    ? [["dashboard", "Admin Dashboard"], ["leads", "Lead Management"], ["plants", "Plant Locations"], ["maintenance", "Maintenance & Cleaning"], ["team", "Team"], ["performance-sc", "SC Performance"], ["performance-lrm", "LRM Performance"], ["configuration", "Configuration"], ["records", "Records"]]
     : state.user?.userType === "sc"
     ? [["dashboard", "SC Dashboard"], ["leads", "My Leads"], ["records", "Records"]]
     : state.user?.userType === "lrm_tl"
@@ -357,6 +360,13 @@ function renderShell(content) {
 
 function top(title, sub, action = "") {
   return `<div class="top"><div><h1>${title}</h1><p>${sub}</p></div><div class="toolbar">${action}<button class="btn" id="refresh">Refresh</button></div></div>`;
+}
+
+function maintenanceView() {
+  const tasks = state.maintenance.tasks || [];
+  const counts = ["Scheduled", "In Progress", "Completed", "Cancelled"].map((s) => `<div class="stat"><div class="k">${s}</div><div class="v">${tasks.filter((t) => t.status === s).length}</div></div>`).join("");
+  const rows = (state.maintenance.plants || []).map((p) => { const t = p.latestTask; return `<div class="card"><div class="section-head"><div><h3>${esc(p.leadId?.customerName || "Customer")}</h3><div class="muted">${esc(p.leadId?.phone || "-")} · ${esc(p.leadId?.address || p.locationLabel || "No address")}</div></div><span class="pill ${badge(t?.status || "Unassigned")}">${esc(t?.status || "Unassigned")}</span></div><div class="grid three"><div><small class="muted">Capacity</small><b>Installed plant</b></div><div><small class="muted">Installed</small><b>${p.installedAt ? new Date(p.installedAt).toLocaleDateString() : "-"}</b></div><div><small class="muted">Next cleaning</small><b>${t?.scheduledDate ? new Date(t.scheduledDate).toLocaleDateString() : "-"}</b></div></div><div class="toolbar"><button class="btn primary compact" data-maint-assign="${p._id}">Assign cleaning</button><button class="btn compact" data-maint-history="${p._id}">View history</button></div></div>`; }).join("");
+  return `${top("Maintenance & Cleaning", "Installed plants, recurring cleaning assignments, and submission tracking.")}<div class="stats">${counts}</div><div class="toolbar"><input id="maintenanceSearch" placeholder="Search customer or address" style="max-width:340px"></div><div class="grid two">${rows || `<div class="empty">No installed plants found.</div>`}</div>`;
 }
 
 function performanceTiles(rows, keys, type) {
@@ -605,7 +615,7 @@ function teamView() {
 
 function userForm(u = {}) {
   const reportsTo = `<div class="field" id="reportsToField" style="${u.userType === "lrm" ? "" : "display:none"}"><label>Reports to (LRM Team Lead)</label><select name="reportsToUserId"><option value="">None</option>${state.users.filter((x) => x.userType === "lrm_tl").map((x) => `<option value="${x._id}" ${String(u.reportsToUserId || "") === String(x._id) ? "selected" : ""}>${esc(x.firstName)} ${esc(x.lastName)}</option>`).join("")}</select></div>`;
-  return `<div class="grid two"><div class="field"><label>First Name</label><input name="firstName" required value="${esc(u.firstName)}"></div><div class="field"><label>Last Name</label><input name="lastName" required value="${esc(u.lastName)}"></div><div class="field"><label>Phone</label><input name="phoneNumber" required value="${esc(u.phoneNumber)}"></div><div class="field"><label>Email</label><input name="email" required value="${esc(u.email)}"></div><div class="field"><label>Password</label><input type="password" name="password"></div><div class="field"><label>Role</label><select name="userType"><option value="lrm_tl" ${u.userType === "lrm_tl" ? "selected" : ""}>LRM Team Lead</option><option value="lrm" ${u.userType === "lrm" ? "selected" : ""}>LRM</option><option value="sc" ${u.userType === "sc" ? "selected" : ""}>SC</option></select></div>${reportsTo}<div class="field"><label>Status</label><select name="status">${["active", "inactive", "blocked"].map((x) => `<option ${u.status === x ? "selected" : ""}>${x}</option>`).join("")}</select></div></div>`;
+  return `<div class="grid two"><div class="field"><label>First Name</label><input name="firstName" required value="${esc(u.firstName)}"></div><div class="field"><label>Last Name</label><input name="lastName" required value="${esc(u.lastName)}"></div><div class="field"><label>Phone</label><input name="phoneNumber" required value="${esc(u.phoneNumber)}"></div><div class="field"><label>Email</label><input name="email" required value="${esc(u.email)}"></div><div class="field"><label>Password</label><input type="password" name="password"></div><div class="field"><label>Role</label><select name="userType"><option value="lrm_tl" ${u.userType === "lrm_tl" ? "selected" : ""}>LRM Team Lead</option><option value="lrm" ${u.userType === "lrm" ? "selected" : ""}>LRM</option><option value="sc" ${u.userType === "sc" ? "selected" : ""}>SC</option><option value="maintenance_cleaning_partner" ${u.userType === "maintenance_cleaning_partner" ? "selected" : ""}>Maintenance & Cleaning Partner</option></select></div>${reportsTo}<div class="field"><label>Status</label><select name="status">${["active", "inactive", "blocked"].map((x) => `<option ${u.status === x ? "selected" : ""}>${x}</option>`).join("")}</select></div></div>`;
 }
 
 function configView() {
@@ -1051,6 +1061,8 @@ function bind() {
   document.querySelector("#addReport")?.addEventListener("click", () => modal("Day-End Report", reportForm(), (data) => api("/activities/daily-reports", { method: "POST", body: JSON.stringify(data) })));
   document.querySelector("#searchReports")?.addEventListener("click", async () => { state.reportDateFilter = document.querySelector("#reportDateFilter")?.value || new Date().toISOString().slice(0, 10); await loadReportsForDate(); });
   document.querySelector("#addPlant")?.addEventListener("click", () => modal("Add Plant Location", plantForm(), (data) => api("/plants", { method: "POST", body: JSON.stringify(data) })));
+  document.querySelectorAll("[data-maint-assign]").forEach((b) => b.onclick = () => modal("Assign Cleaning", `<div class="field"><label>Cleaning date</label><input type="date" name="scheduledDate" required></div>`, async (data) => { await api(`/maintenance/plants/${b.dataset.maintAssign}/tasks`, { method: "POST", body: JSON.stringify(data) }); await loadData(); }));
+  document.querySelectorAll("[data-maint-history]").forEach((b) => b.onclick = async () => { const r = await api(`/maintenance/plants/${b.dataset.maintHistory}/history`); infoModal("Cleaning history", r.tasks.map((t) => `<div class="card"><b>${esc(t.status)}</b> · ${new Date(t.scheduledDate).toLocaleDateString()} · ${t.completedAt ? new Date(t.completedAt).toLocaleString() : "Pending"}<div class="toolbar">${(t.photos || []).map((p) => `<a href="${p.secureUrl}" target="_blank"><img src="${p.secureUrl}" style="width:72px;height:52px;object-fit:cover;border-radius:7px"></a>`).join("")}</div></div>`).join("") || "No cleaning history"); });
   document.querySelectorAll("[data-edit-plant]").forEach((b) => b.onclick = () => { const p = state.plants.find((x) => x._id === b.dataset.editPlant); modal("Edit Plant Location", plantForm(p), (data) => api("/plants", { method: "POST", body: JSON.stringify(data) })); });
   document.querySelectorAll("[data-delete-plant]").forEach((b) => b.onclick = async () => { if (!confirm("Delete this plant location?")) return; try { await api(`/plants/${b.dataset.deletePlant}`, { method: "DELETE" }); await loadData(); } catch (e) { toast(e.message); } });
   bindDocumentButtons();
@@ -1074,6 +1086,7 @@ function render() {
     "performance-lrm": lrmPerformanceView,
     records: recordsView,
     report: reportView,
+    maintenance: maintenanceView,
   };
   renderShell((views[state.view] || dashboardView)());
   if (state.user?.userType === "lrm_tl") document.querySelectorAll(".toolbar .muted").forEach((node) => { if (node.textContent.includes("leads loaded")) node.textContent = `Total ${state.lrmLeadPagination?.total || 0} leads · ${state.selectedLrmLeadIds.length} selected`; });
