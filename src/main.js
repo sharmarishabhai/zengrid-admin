@@ -262,7 +262,7 @@ async function loadData() {
       followUps: data[(canManageCommercialDocs() ? 8 : 5) + offset].followUps || [],
       performance: data[(canManageCommercialDocs() ? 9 : 6) + offset] || { sc: [], lrm: [] },
       reports: data[(canManageCommercialDocs() ? 10 : 7) + offset].reports || [],
-      plants: isAdmin() || state.user?.userType === "sc" ? data[data.length - 1].plants || [] : [],
+      plants: isAdmin() ? data[data.length - 3].plants || [] : state.user?.userType === "sc" ? data[data.length - 1].plants || [] : [],
       maintenance: isAdmin() ? { plants: data[data.length - 2].plants || [], tasks: data[data.length - 1].tasks || [] } : state.maintenance,
     });
     localStorage.setItem("zg_admin_user", JSON.stringify(state.user));
