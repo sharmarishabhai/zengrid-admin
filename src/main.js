@@ -66,7 +66,7 @@ const state = {
   configPage: "system-sizes",
   perfMode: "tiles",
   pages: { leads: 1, quote: 1, payment: 1, gst: 1 },
-  leadFilters: { q: "", leadStatus: "", source: "", assignedToUserId: "", assignedByUserId: "", meeting: "", meetingDateFrom: "", meetingDateTo: "", followUpDateFrom: "", followUpDateTo: "" },
+  leadFilters: { q: "", leadStatus: "", lrmStatus: "", source: "", assignedToUserId: "", assignedByUserId: "", meeting: "", meetingDateFrom: "", meetingDateTo: "", followUpDateFrom: "", followUpDateTo: "" },
   selectedLrmLeadIds: [],
   reportDateFilter: new Date().toISOString().slice(0, 10),
   performanceMonth: new Date().toISOString().slice(0, 7),
@@ -354,10 +354,10 @@ function renderShell(content) {
     ? [["dashboard", "LRM TL Dashboard"], ["leads", "Team Leads"], ["lead-management", "Lead Management"], ["performance", "Team Performance"], ["report", "Reports"]]
     : [["dashboard", "LRM Dashboard"], ["leads", "My Leads"], ["performance", "My Performance"], ["report", "Day-End Report"]];
   const accessLabel = isAdmin() ? "Admin full access" : state.user?.userType === "sc" ? "SC workspace" : state.user?.userType === "lrm_tl" ? "LRM Team Lead workspace" : "LRM workspace";
-  const sidebarStatusFilter = !isAdmin() && state.user?.userType !== "lrm_tl" ? `<div class="field" style="margin:10px 4px 0"><label style="color:#d9e2d2">Lead status</label><select id="sidebarLeadStatus" style="background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.25)"><option value="" style="background:#fff;color:#241a30">All statuses</option>${leadStatuses.map((s) => `<option value="${esc(s)}" style="background:#fff;color:#241a30" ${state.leadFilters.leadStatus === s ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></div>` : "";
+  const sidebarStatusFilter = !isAdmin() && state.user?.userType !== "lrm_tl" ? `<div class="field" style="margin:10px 4px 0"><label style="color:#d9e2d2">LRM status</label><select id="sidebarLeadStatus" style="background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.25)"><option value="" style="background:#fff;color:#241a30">All statuses</option>${lrmLeadStatuses.map((s) => `<option value="${esc(s)}" style="background:#fff;color:#241a30" ${state.leadFilters.lrmStatus === s ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></div>` : "";
   app.innerHTML = `<div class="shell"><aside class="side"><div class="brand"><div class="mark"></div><div>Zen Grid Solar<div class="sub">${esc(state.user?.firstName || "User")} / ${accessLabel}</div></div></div><div class="nav">${nav.map(([id, label]) => `<button class="${state.view === id ? "active" : ""}" data-view="${id}">${label}</button>`).join("")}${sidebarStatusFilter}</div><button class="btn danger" style="margin-top:20px;width:100%" id="logout">Logout</button></aside><main class="main">${content}</main></div>`;
   document.querySelectorAll("[data-view]").forEach((b) => b.onclick = () => { state.view = b.dataset.view; render(); if (state.view === "lead-management") loadData(); });
-  document.querySelector("#sidebarLeadStatus")?.addEventListener("change", (e) => { state.leadFilters.leadStatus = e.target.value; state.view = "leads"; state.pages.leads = 1; render(); });
+  document.querySelector("#sidebarLeadStatus")?.addEventListener("change", (e) => { state.leadFilters.lrmStatus = e.target.value; state.view = "leads"; state.pages.leads = 1; render(); });
   document.querySelector("#logout").onclick = () => { localStorage.clear(); Object.assign(state, { accessToken: "", user: null }); renderLogin(); };
 }
 
@@ -554,7 +554,7 @@ function leadsView() {
     const q = f.q.toLowerCase();
     const hay = [l.customerName, l.leadId, l.phone, l.whatsappNumber, l.email, l.area, l.locality].join(" ").toLowerCase();
     const meetingDate = l.meetingDate || ""; const followDate = l.followUpDate || "";
-    return (!q || hay.includes(q)) && (!f.leadStatus || l.leadStatus === f.leadStatus) && (!f.source || l.source === f.source) && (!f.assignedToUserId || String(l.assignedToUserId || "") === f.assignedToUserId) && (!f.assignedByUserId || String(l.assignedByUserId || "") === f.assignedByUserId) && (!f.meeting || (f.meeting === "scheduled" ? !!l.meetingDate && l.meetingStatus !== "done" : l.meetingStatus === "done")) && (!f.meetingDateFrom || meetingDate >= f.meetingDateFrom) && (!f.meetingDateTo || meetingDate <= f.meetingDateTo) && (!f.followUpDateFrom || followDate >= f.followUpDateFrom) && (!f.followUpDateTo || followDate <= f.followUpDateTo);
+    return (!q || hay.includes(q)) && (!f.leadStatus || l.leadStatus === f.leadStatus) && (!f.lrmStatus || (l.lrmStatus || "New Lead") === f.lrmStatus) && (!f.source || l.source === f.source) && (!f.assignedToUserId || String(l.assignedToUserId || "") === f.assignedToUserId) && (!f.assignedByUserId || String(l.assignedByUserId || "") === f.assignedByUserId) && (!f.meeting || (f.meeting === "scheduled" ? !!l.meetingDate && l.meetingStatus !== "done" : l.meetingStatus === "done")) && (!f.meetingDateFrom || meetingDate >= f.meetingDateFrom) && (!f.meetingDateTo || meetingDate <= f.meetingDateTo) && (!f.followUpDateFrom || followDate >= f.followUpDateFrom) && (!f.followUpDateTo || followDate <= f.followUpDateTo);
   });
   const won = filtered.filter((l) => l.leadStatus === "Won").length;
   const follow = filtered.filter((l) => l.leadStatus === "Follow Up").length;
