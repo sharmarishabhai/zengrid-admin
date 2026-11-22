@@ -295,7 +295,8 @@ async function loadLrmLeadData() {
 }
 
 function renderLogin() {
-  app.innerHTML = `<div class="login"><div class="loginbox"><div class="brand"><div class="mark"></div><div>Zen Grid Solar<div class="sub">Admin CRM</div></div></div><h1>Login</h1><div class="grid"><div class="field"><label>First Name</label><input id="email" autocomplete="username"></div><div class="field"><label>Password</label><input id="password" type="password" autocomplete="current-password"></div><button class="btn primary" id="loginBtn">Login</button></div></div></div>`;
+  app.innerHTML = `<div class="login"><div class="loginbox"><div class="brand"><div class="mark"></div><div>Zen Grid Solar<div class="sub">Admin CRM</div></div></div><h1>Login</h1><div class="grid"><div class="field"><label>First Name</label><input id="email" autocomplete="username"></div><div class="field"><label>Password</label><input id="password" type="password" autocomplete="current-password"><label style="display:flex;flex-direction:row;align-items:center;gap:6px;text-transform:none;font-size:12px;font-weight:700"><input id="showPassword" type="checkbox" style="width:auto"> View password</label></div><button class="btn primary" id="loginBtn">Login</button></div></div></div>`;
+  document.querySelector("#showPassword").onchange = (e) => { document.querySelector("#password").type = e.target.checked ? "text" : "password"; };
   document.querySelector("#loginBtn").onclick = async () => {
     setLoading(true);
     try {
