@@ -803,15 +803,21 @@ function openNewPayment(id) {
 }
 
 function openNewGst(id) {
-  modal("GST Invoice", `<div class="grid two"><div class="field"><label>Customer GSTIN</label><input name="customerGSTIN"></div><div class="field"><label>PAN</label><input name="customerPAN"></div><div class="field"><label>Final Invoice Amount (GST inclusive)</label><input type="number" name="finalAmount" id="gstFinalAmount" min="0" step="0.01"></div><div class="field"><label>Taxable Amount (before GST)</label><input type="number" id="gstTaxableAmount" readonly style="background:#f7f5f1"></div><div class="field"><label>GST @ 8.9%</label><input type="number" name="cgst" id="gstAmount" readonly style="background:#f7f5f1"></div><div class="field" style="grid-column:1/-1"><label>Address</label><textarea name="address"></textarea></div></div>`, async (data) => {
+  modal("GST Invoice", `<div class="grid two"><div class="field"><label>Customer GSTIN</label><div style="display:flex;gap:8px"><input name="customerGSTIN" id="gstinInput" maxlength="15" style="text-transform:uppercase"><button type="button" class="btn compact blue" id="verifyGstin">Verify GSTIN</button></div><small id="gstVerifyStatus" class="muted">Verification is optional; you can still enter details manually.</small></div><div class="field"><label>PAN</label><input name="customerPAN" id="gstPan"></div><div class="field"><label>Customer / Legal Name</label><input name="customerName" id="gstCustomerName"></div><div class="field"><label>Final Invoice Amount (GST inclusive)</label><input type="number" name="finalAmount" id="gstFinalAmount" min="0" step="0.01"></div><div class="field"><label>Taxable Amount (before GST)</label><input type="number" id="gstTaxableAmount" readonly style="background:#f7f5f1"></div><div class="field"><label>GST @ 8.9%</label><input type="number" name="cgst" id="gstAmount" readonly style="background:#f7f5f1"></div><div class="field" style="grid-column:1/-1"><label>Address</label><textarea name="address" id="gstAddress"></textarea></div></div>`, async (data) => {
     
     const finalAmount = Math.max(0, Number(data.finalAmount) || 0);
     const gstAmount = Math.round((finalAmount * 8.9) / 108.9);
     data.taxableAmount = finalAmount - gstAmount;
     data.cgst = gstAmount;
     delete data.finalAmount;
+    delete data.finalAmount;
     const res = await api(`/activities/gst/${id}`, { method: "POST", body: JSON.stringify(data) });
     viewGstPdf(res.invoice);
+  });
+  document.querySelector("#verifyGstin")?.addEventListener("click", async () => {
+    const input = document.querySelector("#gstinInput"); const status = document.querySelector("#gstVerifyStatus"); const gstin = input.value.trim().toUpperCase(); input.value = gstin;
+    status.textContent = "Verifying…";
+    try { const result = await api(`/activities/gst/verify/${encodeURIComponent(gstin)}`); const v = result.verified; document.querySelector("#gstPan").value = v.customerPAN || ""; document.querySelector("#gstCustomerName").value = v.customerName || ""; document.querySelector("#gstAddress").value = v.address || ""; status.textContent = `Verified: ${v.status || "Active"}${v.state ? ` · ${v.state}` : ""}`; status.style.color = "var(--green)"; } catch (e) { status.textContent = e.message || "GSTIN verification failed"; status.style.color = "var(--red)"; }
   });
   const gstGrid = document.querySelector(".modal .grid.two");
   if (gstGrid) { const field = document.createElement("div"); field.className = "field"; field.innerHTML = `<label>Invoice Number (optional)</label><input name="invoiceNo" placeholder="Auto-generated if blank">`; gstGrid.prepend(field); }
