@@ -594,14 +594,15 @@ function lrmTeamLeadLeadsView() {
 }
 
 function leadForm(lead = {}) {
-  const showAssignedBy = isAdmin();
+  const showAssignedBy = isAdmin() || state.user?.userType === "lrm_tl";
+  const lrmUsers = state.lrms.filter((u) => u.userType === "lrm");
   // Keep the dropdown driven by the canonical SC list, but fall back to the
   // loaded team list if the dedicated /users/scs response was unavailable.
   const scUsers = (state.scs.length ? state.scs : state.users.filter((u) => u.userType === "sc"));
   const legacyAssignedName = String(lead.assignedTo || "").trim().toLowerCase();
   const selectedSc = lead.assignedToUserId || scUsers.find((u) => `${u.firstName} ${u.lastName}`.trim().toLowerCase() === legacyAssignedName)?._id || "";
   const scOptions = scUsers.map((u) => `<option value="${u._id}" ${String(selectedSc) === String(u._id) ? "selected" : ""}>${esc(`${u.firstName} ${u.lastName}`.trim())}</option>`).join("");
-  const assigneeFields = `<div class="field"><label>Assigned By (LRM)</label>${showAssignedBy ? `<select name="assignedByUserId" required><option value="">Select LRM</option>${state.lrms.map((u) => `<option value="${u._id}" ${String(lead.assignedByUserId || "") === String(u._id) ? "selected" : ""}>${esc(u.firstName)} ${esc(u.lastName)}</option>`).join("")}</select>` : `<input value="${esc(`${state.user?.firstName || ""} ${state.user?.lastName || ""}`.trim())}" disabled>`}</div><div class="field"><label>Assigned To (SC optional)</label><select name="assignedToUserId"><option value="">No SC yet</option>${scOptions}</select>${!scUsers.length ? `<small class="muted">No SC users are currently available. Add or activate an SC from Team Management.</small>` : ""}</div>`;
+  const assigneeFields = `<div class="field"><label>Assigned By (LRM)</label>${showAssignedBy ? `<select name="assignedByUserId" required><option value="">Select LRM</option>${lrmUsers.map((u) => `<option value="${u._id}" ${String(lead.assignedByUserId || "") === String(u._id) ? "selected" : ""}>${esc(u.firstName)} ${esc(u.lastName)}</option>`).join("")}</select>${!lrmUsers.length ? `<small class="muted">No LRMs are currently assigned to this team.</small>` : ""}` : `<input value="${esc(`${state.user?.firstName || ""} ${state.user?.lastName || ""}`.trim())}" disabled>`}</div><div class="field"><label>Assigned To (SC optional)</label><select name="assignedToUserId"><option value="">No SC yet</option>${scOptions}</select>${!scUsers.length ? `<small class="muted">No SC users are currently available. Add or activate an SC from Team Management.</small>` : ""}</div>`;
   return `<div class="grid two">
     <div class="field"><label>Name</label><input name="customerName" required value="${esc(lead.customerName)}"></div><div class="field"><label>Phone</label><input name="phone" required value="${esc(lead.phone)}"></div>
     <div class="field"><label>WhatsApp Number</label><input name="whatsappNumber" value="${esc(lead.whatsappNumber)}"></div><div class="field"><label>Email</label><input type="email" name="email" value="${esc(lead.email)}"></div>
