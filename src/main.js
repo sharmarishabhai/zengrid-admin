@@ -215,13 +215,14 @@ async function loadData() {
     const me = await api("/auth/me");
     state.user = me.user;
     const isFullLrmLeadManagement = state.user?.userType === "lrm_tl" && state.view === "lead-management";
-    const leadFilter = state.user?.userType === "lrm_tl" && !isFullLrmLeadManagement ? (state.lrmLeadFilter || { assignment: "unassigned" }) : {};
+    const leadFilter = state.view === "fresh-leads" ? {} : state.user?.userType === "lrm_tl" && !isFullLrmLeadManagement ? (state.lrmLeadFilter || { assignment: "unassigned" }) : {};
     const fullPersonalLrm = state.user?.userType === "lrm";
     const leadParams = new URLSearchParams({ limit: isFullLrmLeadManagement || fullPersonalLrm ? "5000" : String(state.lrmLeadPageSize || 25), page: "1" });
     if (leadFilter.assignment) leadParams.set("assignment", leadFilter.assignment);
     if (leadFilter.status) leadParams.set("lrmStatus", leadFilter.status);
     if (leadFilter.lrmId) leadParams.set("lrmAssignedToUserId", leadFilter.lrmId);
     if (leadFilter.q) leadParams.set("q", leadFilter.q);
+    if (state.view === "fresh-leads" && !isAdmin()) { leadParams.set("unassignedSc", "true"); leadParams.set("limit", "5000"); }
     const leadEndpoint = isAdmin() ? "/leads?limit=5000" : `/leads/mine?${leadParams.toString()}`;
     const canLoadLrmResources = isAdmin() || isLrm();
     const baseCalls = [
@@ -351,8 +352,8 @@ function renderShell(content) {
     : state.user?.userType === "sc"
     ? [["dashboard", "SC Dashboard"], ["leads", "My Leads"], ["records", "Records"]]
     : state.user?.userType === "lrm_tl"
-    ? [["dashboard", "LRM TL Dashboard"], ["leads", "Team Leads"], ["lead-management", "Lead Management"], ["performance", "Team Performance"], ["report", "Reports"]]
-    : [["dashboard", "LRM Dashboard"], ["leads", "My Leads"], ["performance", "My Performance"], ["report", "Day-End Report"]];
+    ? [["dashboard", "LRM TL Dashboard"], ["leads", "Team Leads"], ["fresh-leads", "Fresh Leads"], ["lead-management", "Lead Management"], ["performance", "Team Performance"], ["report", "Reports"]]
+    : [["dashboard", "LRM Dashboard"], ["leads", "My Leads"], ["fresh-leads", "Fresh Leads"], ["performance", "My Performance"], ["report", "Day-End Report"]];
   const accessLabel = isAdmin() ? "Admin full access" : state.user?.userType === "sc" ? "SC workspace" : state.user?.userType === "lrm_tl" ? "LRM Team Lead workspace" : "LRM workspace";
   const sidebarStatusFilter = !isAdmin() && state.user?.userType !== "lrm_tl" ? `<div class="field" style="margin:10px 4px 0"><label style="color:#d9e2d2">Lead status</label><select id="sidebarLeadStatus" style="background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.25)"><option value="" style="background:#fff;color:#241a30">All statuses</option>${lrmLeadStatuses.map((s) => `<option value="${esc(s)}" style="background:#fff;color:#241a30" ${state.leadFilters.lrmStatus === s ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></div>` : "";
   app.innerHTML = `<div class="shell"><aside class="side"><div class="brand"><div class="mark"></div><div>Zen Grid Solar<div class="sub">${esc(state.user?.firstName || "User")} / ${accessLabel}</div></div></div><div class="nav">${nav.map(([id, label]) => `<button class="${state.view === id ? "active" : ""}" data-view="${id}">${label}</button>`).join("")}${sidebarStatusFilter}</div><button class="btn danger" style="margin-top:20px;width:100%" id="logout">Logout</button></aside><main class="main">${content}</main></div>`;
