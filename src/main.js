@@ -914,9 +914,10 @@ function zengridLogoMarkup(size = 34) {
 }
 
 function openDocument(html, width = 980, height = 1100) {
-  html = html.replace('<div class="sign-line">Authorized Signatory</div>', '<div style="width:220px;margin:0 0 0 auto;text-align:center"><img src="/quote-assets/signature.jpeg" alt="Zen Grid Solar stamp" style="width:92px;height:92px;object-fit:contain;display:block;margin:0 auto -12px"><div class="sign-line" style="border-top:1.5px solid #0A0F1A;padding-top:.4rem;text-align:center">Authorized Signatory</div></div>');
+  html = html.replace('<div class="sign-line">Authorized Signatory</div>', '<div style="width:220px;margin:0 0 0 auto;text-align:center"><img src="/quote-assets/signature.jpeg" alt="Zen Grid Solar stamp" style="width:56px;height:56px;object-fit:contain;display:block;margin:0 auto -4px"><div class="sign-line" style="border-top:1.5px solid #0A0F1A;padding-top:.25rem;text-align:center">Authorized Signatory</div></div>');
   html = html.replace(/Inclusive of [^%]+% GST/g, "Inclusive of 8.9% GST");
   if (html.includes("<title>GST Invoice")) {
+    html = html.replace('.sign-box p{font-size:11px;color:#9AAABB;margin-bottom:2.5rem}', '.sign-box p{font-size:11px;color:#9AAABB;margin-bottom:.2rem}');
     const taxRows = html.match(/<tr><td>(?:CGST|SGST|IGST)<\/td><td>(.*?)<\/td><\/tr>/g) || [];
     const displayedGst = taxRows.reduce((sum, row) => {
       const amount = row.match(/<td>(?:Rs|₹)\s*([\d,.-]+)/)?.[1] || "0";
