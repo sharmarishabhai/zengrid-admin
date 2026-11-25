@@ -554,7 +554,7 @@ function leadRows(rows = state.leads) {
 }
 
 function leadsView() {
-  if (state.user?.userType === "lrm_tl" && state.view !== "lead-management") return lrmTeamLeadLeadsView();
+  if (state.user?.userType === "lrm_tl" && !["lead-management", "fresh-leads"].includes(state.view)) return lrmTeamLeadLeadsView();
   const f = state.leadFilters;
   const freshCutoff = new Date(); freshCutoff.setDate(freshCutoff.getDate() - 30);
   const leadPool = state.view === "fresh-leads" ? state.leads.filter((l) => !l.assignedToUserId && !l.lrmAssignedToUserId && !l.assignedByUserId && l.createdAt && new Date(l.createdAt) >= freshCutoff) : state.leads;
