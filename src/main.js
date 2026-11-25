@@ -556,8 +556,10 @@ function leadRows(rows = state.leads) {
 function leadsView() {
   if (state.user?.userType === "lrm_tl" && !["lead-management", "fresh-leads"].includes(state.view)) return lrmTeamLeadLeadsView();
   const f = state.leadFilters;
-  const freshCutoff = new Date(); freshCutoff.setDate(freshCutoff.getDate() - 30);
-  const leadPool = state.view === "fresh-leads" ? state.leads.filter((l) => !l.assignedToUserId && !l.lrmAssignedToUserId && !l.assignedByUserId && l.createdAt && new Date(l.createdAt) >= freshCutoff) : state.leads;
+  // The backend scopes Fresh Leads to this LRM/team and filters out SC-owned
+  // leads. Do not require the LRM fields to be empty here: these leads are
+  // expected to already belong to an LRM.
+  const leadPool = state.view === "fresh-leads" ? state.leads.filter((l) => !l.assignedToUserId) : state.leads;
   const filtered = leadPool.filter((l) => {
     const q = f.q.toLowerCase();
     const hay = [l.customerName, l.leadId, l.phone, l.whatsappNumber, l.email, l.area, l.locality].join(" ").toLowerCase();
