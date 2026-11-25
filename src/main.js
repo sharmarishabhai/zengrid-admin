@@ -507,6 +507,11 @@ function leadDetailModal(id) {
 }
 
 function leadRows(rows = state.leads) {
+  const lrmName = (lead) => {
+    const assignedId = lead.lrmAssignedToUserId || lead.assignedByUserId;
+    const assigned = state.lrms.find((u) => String(u._id) === String(assignedId));
+    return assigned ? `${assigned.firstName || ""} ${assigned.lastName || ""}`.trim() : lead.assignedBy || "No LRM";
+  };
   const docButtons = (id) => canManageCommercialDocs() ? `
         <button class="btn icon-btn primary" title="Quote" aria-label="Quote" data-quote="${id}">${icon("quote")}</button>
         ${state.user?.userType === "lrm_tl" ? "" : `<button class="btn icon-btn green" title="Receipt" aria-label="Receipt" data-pay="${id}">${icon("payment")}</button>`}
@@ -530,7 +535,7 @@ function leadRows(rows = state.leads) {
       <div>
         <div class="meta-title">Ownership</div>
         <div class="meta-value">${esc(l.assignedTo || "No SC assigned")}</div>
-        <div class="muted">${esc(l.assignedBy || "No LRM")}</div>
+        <div class="muted">${esc(lrmName(l))}</div>
       </div>
       <div>
         <div class="meta-title">Meeting</div>
