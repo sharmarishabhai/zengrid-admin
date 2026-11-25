@@ -511,7 +511,9 @@ function leadRows(rows = state.leads) {
   const lrmName = (lead) => {
     const assignedId = lead.lrmAssignedToUserId || lead.assignedByUserId;
     const assigned = state.lrms.find((u) => String(u._id) === String(assignedId));
-    return assigned ? `${assigned.firstName || ""} ${assigned.lastName || ""}`.trim() : lead.assignedBy || "No LRM";
+    if (assigned) return `${assigned.firstName || ""} ${assigned.lastName || ""}`.trim();
+    if (String(assignedId || "") === String(state.user?._id || "")) return `${state.user.firstName || ""} ${state.user.lastName || ""}`.trim();
+    return lead.assignedBy || "No LRM";
   };
   const docButtons = (id) => canManageCommercialDocs() ? `
         <button class="btn icon-btn primary" title="Quote" aria-label="Quote" data-quote="${id}">${icon("quote")}</button>
