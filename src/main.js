@@ -587,7 +587,8 @@ function leadsView() {
     const q = f.q.toLowerCase();
     const hay = [l.customerName, l.leadId, l.phone, l.whatsappNumber, l.email, l.area, l.locality].join(" ").toLowerCase();
     const meetingDate = l.meetingDate || ""; const followDate = l.followUpDate || "";
-    return (!q || hay.includes(q)) && (!f.leadStatus || l.leadStatus === f.leadStatus) && (!f.lrmStatus || (l.lrmStatus || "New Lead") === f.lrmStatus) && (!f.source || l.source === f.source) && (!f.assignedToUserId || String(l.assignedToUserId || "") === f.assignedToUserId) && (!f.assignedByUserId || String(l.assignedByUserId || "") === f.assignedByUserId) && (!f.meeting || (f.meeting === "scheduled" ? !!l.meetingDate && l.meetingStatus !== "done" : l.meetingStatus === "done")) && (!f.meetingDateFrom || meetingDate >= f.meetingDateFrom) && (!f.meetingDateTo || meetingDate <= f.meetingDateTo) && (!f.followUpDateFrom || followDate >= f.followUpDateFrom) && (!f.followUpDateTo || followDate <= f.followUpDateTo);
+    const ownerId = l.lrmAssignedToUserId || l.assignedByUserId || "";
+    return (!q || hay.includes(q)) && (!f.leadStatus || l.leadStatus === f.leadStatus) && (!f.lrmStatus || (l.lrmStatus || "New Lead") === f.lrmStatus) && (!f.source || l.source === f.source) && (!f.assignedToUserId || String(l.assignedToUserId || "") === f.assignedToUserId) && (!f.assignedByUserId || String(ownerId) === f.assignedByUserId) && (!f.meeting || (f.meeting === "scheduled" ? !!l.meetingDate && l.meetingStatus !== "done" : l.meetingStatus === "done")) && (!f.meetingDateFrom || meetingDate >= f.meetingDateFrom) && (!f.meetingDateTo || meetingDate <= f.meetingDateTo) && (!f.followUpDateFrom || followDate >= f.followUpDateFrom) && (!f.followUpDateTo || followDate <= f.followUpDateTo);
   });
   const won = filtered.filter((l) => l.leadStatus === "Won").length;
   const follow = filtered.filter((l) => l.leadStatus === "Follow Up").length;
