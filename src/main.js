@@ -226,8 +226,8 @@ async function loadData() {
     if (leadFilter.status) leadParams.set("lrmStatus", leadFilter.status);
     if (leadFilter.lrmId) leadParams.set("lrmAssignedToUserId", leadFilter.lrmId);
     if (leadFilter.q) leadParams.set("q", leadFilter.q);
-    if (state.view === "fresh-leads" && !isAdmin()) { leadParams.set("unassignedSc", "true"); leadParams.set("limit", "5000"); }
-    const leadEndpoint = isAdmin() ? "/leads?limit=5000" : `/leads/mine?${leadParams.toString()}`;
+    if (state.view === "fresh-leads") { leadParams.set("unassignedSc", "true"); leadParams.set("limit", "5000"); }
+    const leadEndpoint = isAdmin() ? `/leads?${leadParams.toString()}` : `/leads/mine?${leadParams.toString()}`;
     const canLoadLrmResources = isAdmin() || isLrm();
     const freshLeadCountRequest = canLoadLrmResources
       ? api(`${isAdmin() ? "/leads" : "/leads/mine"}?unassignedSc=true&limit=1&page=1`)
@@ -577,7 +577,7 @@ function leadsView() {
   // The backend scopes Fresh Leads to this LRM/team and filters out SC-owned
   // leads. Do not require the LRM fields to be empty here: these leads are
   // expected to already belong to an LRM.
-  const leadPool = state.view === "fresh-leads" ? state.leads.filter((l) => !l.assignedToUserId && !String(l.assignedTo || "").trim()) : state.leads;
+  const leadPool = state.view === "fresh-leads" ? state.leads.filter((l) => !l.assignedToUserId && !String(l.assignedTo || "").trim() && (l.lrmStatus || "New Lead") === "New Lead") : state.leads;
   const filtered = leadPool.filter((l) => {
     const q = f.q.toLowerCase();
     const hay = [l.customerName, l.leadId, l.phone, l.whatsappNumber, l.email, l.area, l.locality].join(" ").toLowerCase();
