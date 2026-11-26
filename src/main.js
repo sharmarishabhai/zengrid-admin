@@ -63,6 +63,7 @@ const state = {
   reports: [],
   plants: [],
   maintenance: { plants: [], tasks: [] },
+  freshLeadCount: 0,
   configPage: "system-sizes",
   perfMode: "tiles",
   pages: { leads: 1, quote: 1, payment: 1, gst: 1 },
@@ -98,6 +99,7 @@ table{width:100%;border-collapse:collapse}th,td{padding:12px;border-bottom:1px s
 `;
 document.head.insertAdjacentHTML("beforeend", `<style>${css}</style>`);
 document.head.insertAdjacentHTML("beforeend", `<style>.sidebar-status{margin:12px 4px 0;padding-top:8px;border-top:1px solid rgba(255,255,255,.16)}.sidebar-status-title{color:#d9e2d2;font-size:10px;font-weight:900;margin:0 0 5px}.sidebar-status-btn{display:flex!important;justify-content:space-between;align-items:center;width:100%;min-height:30px;padding:6px 8px!important;border:0!important;border-radius:7px!important;color:#f5f0fb!important;font-size:12px;font-weight:800!important;line-height:1.2}.sidebar-status-btn span{color:#d9e2d2;font-weight:900}.sidebar-status-btn.active,.sidebar-status-btn:hover{background:rgba(255,255,255,.13)!important;color:#fff!important}</style>`);
+document.head.insertAdjacentHTML("beforeend", `<style>.nav>button[data-view]{display:flex;align-items:center;justify-content:space-between;gap:10px}.nav-count{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:20px;padding:0 6px;border-radius:999px;background:#a8b79a;color:#261044;font-size:11px;font-weight:950;line-height:1}</style>`);
 document.head.insertAdjacentHTML("beforeend", `<style>.mark{background:#fff url('/quote-assets/gst-logo.jpeg') center/cover no-repeat!important;overflow:hidden}.mark:after{display:none!important}</style>`);
 document.head.insertAdjacentHTML("beforeend", `<style>.card .lead-filters{grid-template-columns:minmax(220px,2fr) repeat(4,minmax(125px,1fr));gap:8px;align-items:end;margin-bottom:0}.card .lead-filters .field{gap:3px}.card .lead-filters .field label{font-size:9px;letter-spacing:.04em}.card .lead-filters .field input,.card .lead-filters .field select{padding:8px 9px;border-radius:8px;font-size:12px}.lead-filter-card{padding:0;overflow:hidden}.lead-filter-card summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;cursor:pointer;list-style:none;font-weight:900;color:var(--brand)}.lead-filter-card summary::-webkit-details-marker{display:none}.lead-filter-card summary:after{content:"▾";font-size:16px;transition:transform .2s ease}.lead-filter-card:not([open]) summary:after{transform:rotate(-90deg)}.lead-filter-card .lead-filter-body{padding:0 14px 12px}.lead-filter-card .lead-filters+.toolbar{margin-top:8px}.lead-board{max-height:calc(100vh - 300px);overflow-y:auto;padding:2px 7px 2px 2px;scrollbar-width:thin;scrollbar-color:#c9b8dc transparent}.lead-board::-webkit-scrollbar{width:8px}.lead-board::-webkit-scrollbar-thumb{background:#c9b8dc;border-radius:8px}@media(max-width:900px){.card .lead-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.lead-board{max-height:calc(100vh - 390px)}}@media(max-width:600px){.card .lead-filters{grid-template-columns:1fr}.lead-board{max-height:none;overflow:visible}}</style>`);
 document.head.insertAdjacentHTML("beforeend", `<style>.dashboard-hero{position:relative;overflow:hidden;background:linear-gradient(135deg,#4c118f 0%,#6f35b5 58%,#8fa57f 140%);color:#fff;border:0;box-shadow:0 18px 38px rgba(76,17,143,.22)}.dashboard-hero:after{content:"";position:absolute;width:220px;height:220px;right:-55px;top:-95px;border:28px solid rgba(255,255,255,.08);border-radius:50%}.dashboard-hero h2{margin:0 0 5px;font-size:22px;position:relative;z-index:1}.dashboard-hero p{margin:0;color:rgba(255,255,255,.78);position:relative;z-index:1}.dashboard-hero .btn{background:#fff;color:#4c118f;border:0;position:relative;z-index:1;transition:transform .2s ease,box-shadow .2s ease}.dashboard-hero .btn:hover{transform:translateY(-2px);box-shadow:0 8px 18px rgba(0,0,0,.18)}.dashboard-grid{align-items:start}.dashboard-card{transition:transform .2s ease,box-shadow .2s ease}.dashboard-card:hover{transform:translateY(-2px);box-shadow:0 16px 30px rgba(76,17,143,.11)}.dashboard-card h3{display:flex;align-items:center;justify-content:space-between}.dashboard-link{border:0;background:none;color:var(--brand);font-weight:900;cursor:pointer}.dashboard-link:hover{text-decoration:underline}.dashboard-status{display:grid;grid-template-columns:1fr 42px;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid #f0ebf6;cursor:pointer}.dashboard-status:last-child{border-bottom:0}.dashboard-status .bar{grid-column:1/-1}.dashboard-status:hover{color:var(--brand)}.dashboard-status:hover .bar span{filter:brightness(1.08)}.dashboard-recent{display:grid;gap:8px}.dashboard-recent-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid #f0ebf6}.dashboard-recent-row:last-child{border-bottom:0}.dashboard-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.dashboard-actions .btn{transition:transform .2s ease}.dashboard-actions .btn:hover{transform:translateY(-2px)}@media(max-width:600px){.dashboard-hero h2{font-size:19px}.dashboard-hero .grid.two{gap:16px}.dashboard-recent-row{align-items:flex-start;flex-direction:column}}</style>`);
@@ -226,6 +228,9 @@ async function loadData() {
     if (state.view === "fresh-leads" && !isAdmin()) { leadParams.set("unassignedSc", "true"); leadParams.set("limit", "5000"); }
     const leadEndpoint = isAdmin() ? "/leads?limit=5000" : `/leads/mine?${leadParams.toString()}`;
     const canLoadLrmResources = isAdmin() || isLrm();
+    const freshLeadCountRequest = canLoadLrmResources
+      ? api(`${isAdmin() ? "/leads" : "/leads/mine"}?unassignedSc=true&limit=1&page=1`)
+      : Promise.resolve({ pagination: { total: 0 } });
     const baseCalls = [
       api("/activities/summary"), api(leadEndpoint), canLoadLrmResources ? api("/users/scs") : Promise.resolve({ users: [] }), api("/config"),
     ];
@@ -243,6 +248,7 @@ async function loadData() {
     if (isAdmin()) baseCalls.splice(2, 0, api("/users"), api("/users/lrms"));
     else if (state.user?.userType === "lrm_tl") baseCalls.push(api("/users/lrms"));
     const settled = await Promise.allSettled(baseCalls);
+    const freshLeadCountResult = await freshLeadCountRequest.catch(() => ({ pagination: { total: 0 } }));
     if (!state.accessToken || !state.user) return renderLogin();
     const failed = settled.filter((result) => result.status === "rejected");
     const data = settled.map((result) => result.status === "fulfilled" ? result.value : {});
@@ -266,6 +272,7 @@ async function loadData() {
       reports: data[(canManageCommercialDocs() ? 10 : 7) + offset].reports || [],
       plants: isAdmin() ? data[data.length - 3].plants || [] : state.user?.userType === "sc" ? data[data.length - 1].plants || [] : [],
       maintenance: isAdmin() ? { plants: data[data.length - 2].plants || [], tasks: data[data.length - 1].tasks || [] } : state.maintenance,
+      freshLeadCount: Number(freshLeadCountResult.pagination?.total || 0),
     });
     localStorage.setItem("zg_admin_user", JSON.stringify(state.user));
   } catch (e) {
@@ -356,8 +363,10 @@ function renderShell(content) {
     ? [["dashboard", "LRM TL Dashboard"], ["leads", "Team Leads"], ["fresh-leads", "Fresh Leads"], ["lead-management", "Lead Management"], ["performance", "Team Performance"], ["report", "Reports"]]
     : [["dashboard", "LRM Dashboard"], ["leads", "My Leads"], ["fresh-leads", "Fresh Leads"], ["performance", "My Performance"], ["report", "Day-End Report"]];
   const accessLabel = isAdmin() ? "Admin full access" : state.user?.userType === "sc" ? "SC workspace" : state.user?.userType === "lrm_tl" ? "LRM Team Lead workspace" : "LRM workspace";
+  const freshCount = isAdmin() || ["lrm", "lrm_tl"].includes(state.user?.userType) ? Number(state.freshLeadCount || 0) : 0;
+  const navMarkup = nav.map(([id, label]) => `<button class="${state.view === id ? "active" : ""}" data-view="${id}"><span>${label}</span>${id === "fresh-leads" ? `<span class="nav-count" aria-label="${freshCount} fresh leads">${freshCount}</span>` : ""}</button>`).join("");
   const sidebarStatusFilter = state.user?.userType === "lrm" ? `<div class="sidebar-status" style="display:grid!important;gap:7px!important;margin:12px 4px 0!important">${lrmLeadStatuses.filter((s) => s !== "New Lead").map((s) => { const count = state.leads.filter((lead) => (lead.lrmStatus || "New Lead") === s).length; return `<button type="button" class="sidebar-status-btn ${state.leadFilters.lrmStatus === s ? "active" : ""}" data-sidebar-status="${esc(s)}" style="display:flex!important;width:100%!important;justify-content:space-between!important">${esc(s)} <span>${count}</span></button>`; }).join("")}</div>` : "";
-  app.innerHTML = `<div class="shell"><aside class="side"><div class="brand"><div class="mark"></div><div>Zen Grid Solar<div class="sub">${esc(state.user?.firstName || "User")} / ${accessLabel}</div></div></div><div class="nav">${nav.map(([id, label]) => `<button class="${state.view === id ? "active" : ""}" data-view="${id}">${label}</button>`).join("")}${sidebarStatusFilter}</div><button class="btn danger" style="margin-top:20px;width:100%" id="logout">Logout</button></aside><main class="main">${content}</main></div>`;
+  app.innerHTML = `<div class="shell"><aside class="side"><div class="brand"><div class="mark"></div><div>Zen Grid Solar<div class="sub">${esc(state.user?.firstName || "User")} / ${accessLabel}</div></div></div><div class="nav">${navMarkup}${sidebarStatusFilter}</div><button class="btn danger" style="margin-top:20px;width:100%" id="logout">Logout</button></aside><main class="main">${content}</main></div>`;
   document.querySelectorAll("[data-view]").forEach((b) => b.onclick = () => { state.view = b.dataset.view; render(); if (["lead-management", "fresh-leads"].includes(state.view)) loadData(); });
   document.querySelectorAll("[data-sidebar-status]").forEach((b) => b.onclick = () => { state.leadFilters.lrmStatus = b.dataset.sidebarStatus || ""; state.view = "leads"; state.pages.leads = 1; render(); });
   document.querySelector("#logout").onclick = () => { localStorage.clear(); Object.assign(state, { accessToken: "", user: null }); renderLogin(); };
