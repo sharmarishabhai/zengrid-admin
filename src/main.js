@@ -64,6 +64,7 @@ const state = {
   plants: [],
   maintenance: { plants: [], tasks: [] },
   freshLeadCount: 0,
+  sidebarStatusCounts: {},
   configPage: "system-sizes",
   perfMode: "tiles",
   pages: { leads: 1, quote: 1, payment: 1, gst: 1 },
@@ -231,6 +232,9 @@ async function loadData() {
     const freshLeadCountRequest = canLoadLrmResources
       ? api(`${isAdmin() ? "/leads" : "/leads/mine"}?unassignedSc=true&limit=1&page=1`)
       : Promise.resolve({ pagination: { total: 0 } });
+    const sidebarStatusCountRequest = state.user?.userType === "lrm_tl"
+      ? Promise.all(lrmLeadStatuses.map((status) => api(`/leads/mine?lrmStatus=${encodeURIComponent(status)}&limit=1&page=1`).catch(() => ({ pagination: { total: 0 } }))))
+      : Promise.resolve([]);
     const baseCalls = [
       api("/activities/summary"), api(leadEndpoint), canLoadLrmResources ? api("/users/scs") : Promise.resolve({ users: [] }), api("/config"),
     ];
@@ -249,6 +253,7 @@ async function loadData() {
     else if (state.user?.userType === "lrm_tl") baseCalls.push(api("/users/lrms"));
     const settled = await Promise.allSettled(baseCalls);
     const freshLeadCountResult = await freshLeadCountRequest.catch(() => ({ pagination: { total: 0 } }));
+    const sidebarStatusResults = await sidebarStatusCountRequest;
     if (!state.accessToken || !state.user) return renderLogin();
     const failed = settled.filter((result) => result.status === "rejected");
     const data = settled.map((result) => result.status === "fulfilled" ? result.value : {});
@@ -273,6 +278,7 @@ async function loadData() {
       plants: isAdmin() ? data[data.length - 3].plants || [] : state.user?.userType === "sc" ? data[data.length - 1].plants || [] : [],
       maintenance: isAdmin() ? { plants: data[data.length - 2].plants || [], tasks: data[data.length - 1].tasks || [] } : state.maintenance,
       freshLeadCount: Number(freshLeadCountResult.pagination?.total || 0),
+      sidebarStatusCounts: Object.fromEntries(lrmLeadStatuses.map((status, index) => [status, Number(sidebarStatusResults[index]?.pagination?.total || 0)])),
     });
     localStorage.setItem("zg_admin_user", JSON.stringify(state.user));
   } catch (e) {
@@ -365,10 +371,10 @@ function renderShell(content) {
   const accessLabel = isAdmin() ? "Admin full access" : state.user?.userType === "sc" ? "SC workspace" : state.user?.userType === "lrm_tl" ? "LRM Team Lead workspace" : "LRM workspace";
   const freshCount = isAdmin() || ["lrm", "lrm_tl"].includes(state.user?.userType) ? Number(state.freshLeadCount || 0) : 0;
   const navMarkup = nav.map(([id, label]) => `<button class="${state.view === id ? "active" : ""}" data-view="${id}"><span>${label}</span>${id === "fresh-leads" ? `<span class="nav-count" aria-label="${freshCount} fresh leads">${freshCount}</span>` : ""}</button>`).join("");
-  const sidebarStatusFilter = state.user?.userType === "lrm" ? `<div class="sidebar-status" style="display:grid!important;gap:7px!important;margin:12px 4px 0!important">${lrmLeadStatuses.filter((s) => s !== "New Lead").map((s) => { const count = state.leads.filter((lead) => (lead.lrmStatus || "New Lead") === s).length; return `<button type="button" class="sidebar-status-btn ${state.leadFilters.lrmStatus === s ? "active" : ""}" data-sidebar-status="${esc(s)}" style="display:flex!important;width:100%!important;justify-content:space-between!important">${esc(s)} <span>${count}</span></button>`; }).join("")}</div>` : "";
+  const sidebarStatusFilter = ["lrm", "lrm_tl"].includes(state.user?.userType) ? `<div class="sidebar-status" style="display:grid!important;gap:7px!important;margin:12px 4px 0!important">${lrmLeadStatuses.filter((s) => s !== "New Lead").map((s) => { const count = state.user?.userType === "lrm_tl" ? Number(state.sidebarStatusCounts[s] || 0) : state.leads.filter((lead) => (lead.lrmStatus || "New Lead") === s).length; return `<button type="button" class="sidebar-status-btn ${((state.user?.userType === "lrm_tl" ? state.lrmLeadFilter.status : state.leadFilters.lrmStatus) === s) ? "active" : ""}" data-sidebar-status="${esc(s)}" style="display:flex!important;width:100%!important;justify-content:space-between!important">${esc(s)} <span>${count}</span></button>`; }).join("")}</div>` : "";
   app.innerHTML = `<div class="shell"><aside class="side"><div class="brand"><div class="mark"></div><div>Zen Grid Solar<div class="sub">${esc(state.user?.firstName || "User")} / ${accessLabel}</div></div></div><div class="nav">${navMarkup}${sidebarStatusFilter}</div><button class="btn danger" style="margin-top:20px;width:100%" id="logout">Logout</button></aside><main class="main">${content}</main></div>`;
   document.querySelectorAll("[data-view]").forEach((b) => b.onclick = () => { state.view = b.dataset.view; render(); if (["lead-management", "fresh-leads"].includes(state.view)) loadData(); });
-  document.querySelectorAll("[data-sidebar-status]").forEach((b) => b.onclick = () => { state.leadFilters.lrmStatus = b.dataset.sidebarStatus || ""; state.view = "leads"; state.pages.leads = 1; render(); });
+  document.querySelectorAll("[data-sidebar-status]").forEach((b) => b.onclick = () => { const status = b.dataset.sidebarStatus || ""; if (state.user?.userType === "lrm_tl") { state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), status, assignment: "" }; state.lrmLeadPage = 1; } else { state.leadFilters.lrmStatus = status; state.pages.leads = 1; } state.view = "leads"; render(); if (state.user?.userType === "lrm_tl") loadData(); });
   document.querySelector("#logout").onclick = () => { localStorage.clear(); Object.assign(state, { accessToken: "", user: null }); renderLogin(); };
 }
 
