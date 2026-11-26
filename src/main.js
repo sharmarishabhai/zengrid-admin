@@ -260,10 +260,15 @@ async function loadData() {
     if (failed.length) toast(`${failed.length} dashboard service${failed.length > 1 ? "s" : ""} unavailable; other data loaded`);
     if (requestId !== loadSequence) return;
     const offset = isAdmin() ? 2 : 0;
+    const responseLeads = data[1].leads || [];
+    const freshLeads = responseLeads.filter((lead) => !lead.assignedToUserId && !String(lead.assignedTo || "").trim() && (lead.lrmStatus || "New Lead") === "New Lead");
+    const visibleLeads = state.view === "fresh-leads" ? freshLeads : responseLeads;
     Object.assign(state, {
       summary: data[0].summary || {},
-      leads: data[1].leads || [],
-      lrmLeadPagination: data[1].pagination || {},
+      leads: visibleLeads,
+      lrmLeadPagination: state.view === "fresh-leads"
+        ? { ...(data[1].pagination || {}), total: freshLeads.length, pages: 1, page: 1 }
+        : (data[1].pagination || {}),
       users: isAdmin() ? data[2].users || [] : [],
       lrms: isAdmin() ? data[3].users || [] : state.user?.userType === "lrm_tl" ? (data.find((x) => Array.isArray(x.users) && x.users.some((u) => u.userType === "lrm"))?.users || []) : [],
       scs: data[2 + offset].users || [],
