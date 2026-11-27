@@ -222,10 +222,25 @@ async function loadData() {
     const leadFilter = state.view === "fresh-leads" ? {} : state.user?.userType === "lrm_tl" && !isFullLrmLeadManagement ? (state.lrmLeadFilter || { assignment: "unassigned" }) : {};
     const fullPersonalLrm = state.user?.userType === "lrm";
     const leadParams = new URLSearchParams({ limit: isFullLrmLeadManagement || fullPersonalLrm ? "5000" : String(state.lrmLeadPageSize || 25), page: "1" });
+    if (isAdmin()) leadParams.set("limit", "5000");
     if (leadFilter.assignment) leadParams.set("assignment", leadFilter.assignment);
     if (leadFilter.status) leadParams.set("lrmStatus", leadFilter.status);
     if (leadFilter.lrmId) leadParams.set("lrmAssignedToUserId", leadFilter.lrmId);
     if (leadFilter.q) leadParams.set("q", leadFilter.q);
+    if (isAdmin()) {
+      const f = state.leadFilters || {};
+      if (f.q) leadParams.set("q", f.q);
+      if (f.leadStatus) leadParams.set("status", f.leadStatus);
+      if (f.source) leadParams.set("source", f.source);
+      if (f.lrmStatus) leadParams.set("lrmStatus", f.lrmStatus);
+      if (f.assignedToUserId) leadParams.set("assignedToUserId", f.assignedToUserId);
+      if (f.assignedByUserId) leadParams.set("assignedByUserId", f.assignedByUserId);
+      if (f.meeting) leadParams.set("meeting", f.meeting);
+      if (f.meetingDateFrom) leadParams.set("meetingDateFrom", f.meetingDateFrom);
+      if (f.meetingDateTo) leadParams.set("meetingDateTo", f.meetingDateTo);
+      if (f.followUpDateFrom) leadParams.set("followUpDateFrom", f.followUpDateFrom);
+      if (f.followUpDateTo) leadParams.set("followUpDateTo", f.followUpDateTo);
+    }
     if (state.view === "fresh-leads") { leadParams.set("unassignedSc", "true"); leadParams.set("limit", "5000"); }
     const leadEndpoint = isAdmin() ? `/leads?${leadParams.toString()}` : `/leads/mine?${leadParams.toString()}`;
     const canLoadLrmResources = isAdmin() || isLrm();
@@ -1028,9 +1043,12 @@ function bind() {
   document.querySelectorAll("[data-performance-period]").forEach((b) => b.onclick = () => { const now = new Date(); state.performancePeriod = b.dataset.performancePeriod === "all" ? "all" : "month"; if (b.dataset.performancePeriod === "this") state.performanceMonth = now.toISOString().slice(0, 7); if (b.dataset.performancePeriod === "last") { now.setMonth(now.getMonth() - 1); state.performanceMonth = now.toISOString().slice(0, 7); } loadData(); });
   document.querySelectorAll("[data-set-target]").forEach((b) => b.onclick = () => { const row = (state.performance.lrm || []).find((item) => String(item.userId) === String(b.dataset.setTarget)) || {}; modal("Set Performance Target", `<p class="muted">Set targets for this LRM. Cancel will discard all changes.</p><div class="grid three"><div class="field"><label>Meetings Scheduled</label><input type="number" min="0" name="meetingsScheduled" value="${Number(row.targets?.meetingsScheduled || 0)}" required></div><div class="field"><label>Meetings Done</label><input type="number" min="0" name="meetingsDone" value="${Number(row.targets?.meetingsDone || 0)}" required></div><div class="field"><label>Orders Closed</label><input type="number" min="0" name="ordersClosed" value="${Number(row.targets?.ordersClosed || 0)}" required></div></div>`, async (data) => { await api(`/users/${b.dataset.setTarget}/performance-target`, { method: "PATCH", body: JSON.stringify(data) }); toast("Target saved"); }); });
   document.querySelectorAll("[data-lead-filter]").forEach((el) => {
-    el.addEventListener("change", () => { state.leadFilters[el.dataset.leadFilter] = el.value; state.pages.leads = 1; render(); });
+    const updateLeadFilter = () => { state.leadFilters[el.dataset.leadFilter] = el.value; state.pages.leads = 1; render(); loadData(); };
+    el.addEventListener(el.dataset.leadFilter === "q" ? "input" : "change", () => {
+      if (el.dataset.leadFilter === "q") { clearTimeout(window.__zgLeadSearchTimer); window.__zgLeadSearchTimer = setTimeout(updateLeadFilter, 300); } else updateLeadFilter();
+    });
   });
-  document.querySelector("#clearLeadFilters")?.addEventListener("click", () => { Object.keys(state.leadFilters).forEach((k) => { state.leadFilters[k] = ""; }); state.pages.leads = 1; render(); });
+  document.querySelector("#clearLeadFilters")?.addEventListener("click", () => { Object.keys(state.leadFilters).forEach((k) => { state.leadFilters[k] = ""; }); state.pages.leads = 1; render(); loadData(); });
   document.querySelector("#addLead")?.addEventListener("click", () => modal("Add Lead", leadForm(), (data) => api("/leads", { method: "POST", body: JSON.stringify(data) })));
   document.querySelectorAll("[data-lrm-select]").forEach((el) => el.onchange = () => { const id = el.dataset.lrmSelect; state.selectedLrmLeadIds = el.checked ? [...new Set([...state.selectedLrmLeadIds, id])] : state.selectedLrmLeadIds.filter((x) => x !== id); render(); });
   document.querySelector("[data-lrm-select-all]")?.addEventListener("change", (e) => { e.stopPropagation(); const ids = [...document.querySelectorAll("[data-lrm-select]")].map((el) => String(el.dataset.lrmSelect)); state.selectedLrmLeadIds = e.target.checked ? [...new Set([...state.selectedLrmLeadIds.map(String), ...ids])] : state.selectedLrmLeadIds.filter((id) => !ids.includes(String(id))); render(); });
