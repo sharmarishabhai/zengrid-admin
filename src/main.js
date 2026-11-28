@@ -224,6 +224,9 @@ async function loadData() {
     if (["leads", "fresh-leads", "lead-management"].includes(state.view)) {
       return loadLeadPageData(requestId);
     }
+    if (["performance", "performance-sc", "performance-lrm", "report", "records", "configuration", "team", "plants", "maintenance"].includes(state.view)) {
+      return loadSinglePageData(requestId);
+    }
     const isFullLrmLeadManagement = state.user?.userType === "lrm_tl" && state.view === "lead-management";
     const leadFilter = state.view === "fresh-leads" ? {} : state.user?.userType === "lrm_tl" && !isFullLrmLeadManagement ? (state.lrmLeadFilter || { assignment: "unassigned" }) : {};
     const fullPersonalLrm = state.user?.userType === "lrm";
@@ -329,10 +332,11 @@ async function loadLeadPageData(requestId = ++loadSequence) {
   try {
     const userType = state.user?.userType;
     const fresh = state.view === "fresh-leads";
-    const params = new URLSearchParams({ limit: isAdmin() ? "5000" : String(state.lrmLeadPageSize || 25), page: "1" });
+    const requestedPage = userType === "lrm_tl" && state.view === "lead-management" ? state.lrmLeadPage : state.pages.leads || 1;
+    const params = new URLSearchParams({ limit: "25", page: String(requestedPage) });
     if (fresh) params.set("fresh", "true");
     if (userType === "lrm_tl" && state.view === "leads") {
-      const filter = state.lrmLeadFilter || {};
+    const filter = state.lrmLeadFilter || {};
       if (filter.assignment) params.set("assignment", filter.assignment);
       if (filter.status) params.set("lrmStatus", filter.status);
       if (filter.lrmId) params.set("lrmAssignedToUserId", filter.lrmId);
@@ -372,6 +376,8 @@ async function loadLeadPageData(requestId = ++loadSequence) {
       if (userType === "lrm_tl") state.lrms = resourceData.find((data) => Array.isArray(data.users) && data.users.some((u) => u.userType === "lrm"))?.users || [];
     }
     state.freshLeadCount = fresh ? Number(leadData.pagination?.total || 0) : state.freshLeadCount;
+    if (userType === "lrm_tl" && state.view === "lead-management") state.lrmLeadPage = Number(leadData.pagination?.page || requestedPage);
+    else state.pages.leads = Number(leadData.pagination?.page || requestedPage);
     if (results.some((result) => result.status === "rejected")) toast("Some lead resources were unavailable; lead data loaded");
     render();
   } catch (error) {
@@ -407,6 +413,50 @@ async function loadDashboardPageData(requestId = ++loadSequence) {
   } catch (error) {
     if (requestId !== loadSequence) return;
     toast(error.message || "Unable to load dashboard");
+    render();
+  }
+}
+
+async function loadSinglePageData(requestId = ++loadSequence) {
+  const view = state.view;
+  try {
+    const month = encodeURIComponent(state.performanceMonth || new Date().toISOString().slice(0, 7));
+    const date = encodeURIComponent(state.reportDateFilter || new Date().toISOString().slice(0, 10));
+    const calls = {
+      performance: () => [api(`/activities/performance?${state.performancePeriod === "all" ? "period=all" : `month=${month}`}`)],
+      "performance-sc": () => [api(`/activities/performance?${state.performancePeriod === "all" ? "period=all" : `month=${month}`}`)],
+      "performance-lrm": () => [api(`/activities/performance?${state.performancePeriod === "all" ? "period=all" : `month=${month}`}`)],
+      report: () => [api(`/activities/daily-reports?reportDate=${date}`)],
+      records: () => [api("/activities/quotes?limit=500"), api("/activities/payments?limit=500"), api("/activities/gst?limit=500")],
+      configuration: () => [api("/config")],
+      team: () => isAdmin() ? [api("/users"), api("/users/lrms")] : [api("/users/lrms")],
+      plants: () => [api("/plants")],
+      maintenance: () => [api("/maintenance/plants"), api("/maintenance/tasks")],
+    }[view]();
+    const results = await Promise.allSettled(calls);
+    if (requestId !== loadSequence) return;
+    const value = (index, fallback = {}) => results[index]?.status === "fulfilled" ? results[index].value : fallback;
+    if (view.startsWith("performance")) state.performance = value(0, { sc: [], lrm: [] });
+    if (view === "report") state.reports = value(0, { reports: [] }).reports || [];
+    if (view === "records") {
+      state.quotes = value(0, { quotes: [] }).quotes || [];
+      state.payments = value(1, { payments: [] }).payments || [];
+      state.gst = value(2, { invoices: [] }).invoices || [];
+    }
+    if (view === "configuration") state.configs = value(0, { items: [] }).items || [];
+    if (view === "team") {
+      if (isAdmin()) {
+        state.users = value(0, { users: [] }).users || [];
+        state.lrms = value(1, { users: [] }).users || [];
+      } else state.lrms = value(0, { users: [] }).users || [];
+    }
+    if (view === "plants") state.plants = value(0, { plants: [] }).plants || [];
+    if (view === "maintenance") state.maintenance = { plants: value(0, { plants: [] }).plants || [], tasks: value(1, { tasks: [] }).tasks || [] };
+    if (results.some((result) => result.status === "rejected")) toast("Some page data was unavailable; available data loaded");
+    render();
+  } catch (error) {
+    if (requestId !== loadSequence) return;
+    toast(error.message || "Unable to load page data");
     render();
   }
 }
@@ -696,18 +746,15 @@ function leadsView() {
   // leads. Do not require the LRM fields to be empty here: these leads are
   // expected to already belong to an LRM.
   const leadPool = state.leads;
-  const filtered = leadPool.filter((l) => {
-    const q = f.q.toLowerCase();
-    const hay = [l.customerName, l.leadId, l.phone, l.whatsappNumber, l.email, l.address, l.area, l.locality, l.source, l.assignedTo, l.assignedBy, l.note].join(" ").toLowerCase();
-    const meetingDate = l.meetingDate || ""; const followDate = l.followUpDate || "";
-    const ownerId = l.lrmAssignedToUserId || l.assignedByUserId || "";
-    return (!q || hay.includes(q)) && (!f.leadStatus || l.leadStatus === f.leadStatus) && (!f.lrmStatus || (l.lrmStatus || "New Lead") === f.lrmStatus) && (!f.source || l.source === f.source) && (!f.assignedToUserId || String(l.assignedToUserId || "") === f.assignedToUserId) && (!f.assignedByUserId || String(ownerId) === f.assignedByUserId) && (!f.meeting || (f.meeting === "scheduled" ? !!l.meetingDate && l.meetingStatus !== "done" : l.meetingStatus === "done")) && (!f.meetingDateFrom || meetingDate >= f.meetingDateFrom) && (!f.meetingDateTo || meetingDate <= f.meetingDateTo) && (!f.followUpDateFrom || followDate >= f.followUpDateFrom) && (!f.followUpDateTo || followDate <= f.followUpDateTo);
-  });
+  // Search, filters, authorization, and pagination are applied by the API.
+  // Do not re-filter the current page on the client.
+  const filtered = leadPool;
   const won = filtered.filter((l) => l.leadStatus === "Won").length;
   const follow = filtered.filter((l) => l.leadStatus === "Follow Up").length;
   const meetings = filtered.filter((l) => l.meetingDate).length;
   const unassigned = filtered.filter((l) => !l.assignedToUserId).length;
-  const visibleLeads = pageRows(filtered, "leads");
+  const visibleLeads = filtered;
+  const leadTotal = Number(state.lrmLeadPagination?.total ?? filtered.length);
   const select = (name, value, options, label) => `<div class="field"><label>${label}</label><select data-lead-filter="${name}"><option value="">All ${label}</option>${options.map((x) => `<option value="${esc(x.value || x)}" ${String(value) === String(x.value || x) ? "selected" : ""}>${esc(x.label || x)}</option>`).join("")}</select></div>`;
   const activeFilters = Object.values(f).some(Boolean);
   const leadActions = state.user?.userType === "lrm" ? `<button class="btn primary" id="addLead">Add Lead</button>` : `<button class="btn" id="downloadLeadSample">Download sample</button><button class="btn" id="importLeads">Import leads</button><button class="btn primary" id="addLead">Add Lead</button>`;
@@ -719,9 +766,9 @@ function leadsView() {
     <div class="mini-stat"><span class="k">Unassigned SC</span><b>${unassigned}</b></div>
   </div>
    <details class="card lead-filter-card" ${activeFilters ? "open" : ""}><summary><span>Lead filters${activeFilters ? " · Active" : ""}</span><span class="muted">${filtered.length} matching leads</span></summary><div class="lead-filter-body"><div class="lead-filters" style="margin:0"><div class="field"><label>Search leads</label><input data-lead-filter="q" value="${esc(f.q)}" placeholder="Name, phone, ID, email, area..."></div>${select("leadStatus", f.leadStatus, leadStatuses, "Status")}${select("source", f.source, ["Website","Social Media","Field Visit","Import"], "Source")}${select("assignedToUserId", f.assignedToUserId, state.scs.map((u) => ({ value:u._id, label:`${u.firstName} ${u.lastName}` })), "Consultant")}${select("assignedByUserId", f.assignedByUserId, state.lrms.map((u) => ({ value:u._id, label:`${u.firstName} ${u.lastName}` })), "LRM") }<div class="field"><label>Meeting</label><select data-lead-filter="meeting"><option value="">All meetings</option><option value="scheduled" ${f.meeting === "scheduled" ? "selected" : ""}>Scheduled</option><option value="done" ${f.meeting === "done" ? "selected" : ""}>Meeting Done</option></select></div><div class="field"><label>Meeting date from</label><input type="date" data-lead-filter="meetingDateFrom" value="${f.meetingDateFrom}"></div><div class="field"><label>Meeting date to</label><input type="date" data-lead-filter="meetingDateTo" value="${f.meetingDateTo}"></div><div class="field"><label>Follow-up from</label><input type="date" data-lead-filter="followUpDateFrom" value="${f.followUpDateFrom}"></div><div class="field"><label>Follow-up to</label><input type="date" data-lead-filter="followUpDateTo" value="${f.followUpDateTo}"></div></div><div class="toolbar" style="margin-bottom:0"><span class="muted">Use filters to narrow the list</span>${activeFilters ? `<button class="btn compact" id="clearLeadFilters">Clear filters</button>` : ""}</div></div></details>
-  ${pager("leads", filtered.length)}
+  ${pager("leads", leadTotal)}
   <div class="lead-board">${leadRows(visibleLeads) || `<div class="empty">No leads found</div>`}</div>
-  ${pager("leads", filtered.length)}`;
+  ${pager("leads", leadTotal)}`;
 }
 
 function lrmTeamLeadLeadsView() {
@@ -1132,6 +1179,11 @@ function bind() {
   document.querySelector("#dashboardViewPerformance")?.addEventListener("click", () => { state.view = isAdmin() ? "performance-sc" : "performance"; render(); });
   document.querySelectorAll("[data-page]").forEach((b) => b.onclick = () => {
     const [name, rawPage] = b.dataset.page.split(":");
+    if (name === "leads") {
+      state.pages.leads = Math.max(1, Number(rawPage));
+      loadData();
+      return;
+    }
     const rows = name === "leads" ? state.leads : name === "quote" ? state.quotes : name === "payment" ? state.payments : state.gst;
     state.pages[name] = clampPage(Number(rawPage), rows.length, pageSize[name] || 25);
     render();
