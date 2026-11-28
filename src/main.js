@@ -241,11 +241,12 @@ async function loadData() {
       if (f.followUpDateFrom) leadParams.set("followUpDateFrom", f.followUpDateFrom);
       if (f.followUpDateTo) leadParams.set("followUpDateTo", f.followUpDateTo);
     }
-    if (state.view === "fresh-leads") { leadParams.set("unassignedSc", "true"); leadParams.set("limit", "5000"); }
+    if (state.view === "fresh-leads") { leadParams.set("fresh", "true"); leadParams.set("limit", "5000"); }
     const leadEndpoint = isAdmin() ? `/leads?${leadParams.toString()}` : `/leads/mine?${leadParams.toString()}`;
     const canLoadLrmResources = isAdmin() || isLrm();
-    const freshLeadCountRequest = canLoadLrmResources
-      ? api(`${isAdmin() ? "/leads" : "/leads/mine"}?unassignedSc=true&limit=1&page=1`)
+    const canLoadFreshCount = isAdmin() || ["lrm", "lrm_tl"].includes(state.user?.userType);
+    const freshLeadCountRequest = canLoadFreshCount
+      ? api(`${isAdmin() ? "/leads" : "/leads/mine"}?fresh=true&limit=1&page=1`)
       : Promise.resolve({ pagination: { total: 0 } });
     const sidebarStatusCountRequest = state.user?.userType === "lrm_tl"
       ? Promise.all(lrmLeadStatuses.map((status) => api(`/leads/mine?lrmStatus=${encodeURIComponent(status)}&limit=1&page=1`).catch(() => ({ pagination: { total: 0 } }))))
@@ -276,14 +277,13 @@ async function loadData() {
     if (requestId !== loadSequence) return;
     const offset = isAdmin() ? 2 : 0;
     const responseLeads = data[1].leads || [];
-    const freshLeads = responseLeads.filter((lead) => !lead.assignedToUserId && !String(lead.assignedTo || "").trim() && (lead.lrmStatus || "New Lead") === "New Lead");
-    const visibleLeads = state.view === "fresh-leads" ? freshLeads : responseLeads;
+    // Fresh rows are already role-scoped by the backend. Do not filter the
+    // paginated response again on the client or counts and rows can diverge.
+    const visibleLeads = responseLeads;
     Object.assign(state, {
       summary: data[0].summary || {},
       leads: visibleLeads,
-      lrmLeadPagination: state.view === "fresh-leads"
-        ? { ...(data[1].pagination || {}), total: freshLeads.length, pages: 1, page: 1 }
-        : (data[1].pagination || {}),
+      lrmLeadPagination: data[1].pagination || {},
       users: isAdmin() ? data[2].users || [] : [],
       lrms: isAdmin() ? data[3].users || [] : state.user?.userType === "lrm_tl" ? (data.find((x) => Array.isArray(x.users) && x.users.some((u) => u.userType === "lrm"))?.users || []) : [],
       scs: data[2 + offset].users || [],
@@ -597,7 +597,7 @@ function leadsView() {
   // The backend scopes Fresh Leads to this LRM/team and filters out SC-owned
   // leads. Do not require the LRM fields to be empty here: these leads are
   // expected to already belong to an LRM.
-  const leadPool = state.view === "fresh-leads" ? state.leads.filter((l) => !l.assignedToUserId && !String(l.assignedTo || "").trim() && (l.lrmStatus || "New Lead") === "New Lead") : state.leads;
+  const leadPool = state.leads;
   const filtered = leadPool.filter((l) => {
     const q = f.q.toLowerCase();
     const hay = [l.customerName, l.leadId, l.phone, l.whatsappNumber, l.email, l.address, l.area, l.locality, l.source, l.assignedTo, l.assignedBy, l.note].join(" ").toLowerCase();
