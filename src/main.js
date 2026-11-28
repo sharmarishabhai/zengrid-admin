@@ -163,21 +163,29 @@ const icon = (name) => ({
   view: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>',
 })[name] || "";
 
+function fetchWithTimeout(url, options = {}, timeoutMs = 20000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...options, signal: controller.signal })
+    .catch((error) => { if (error.name === "AbortError") throw new Error("Request timed out. Please try again."); throw error; })
+    .finally(() => clearTimeout(timer));
+}
+
 async function api(path, options = {}) {
   setLoading(true);
   const headers = new Headers(options.headers || {});
   headers.set("Content-Type", "application/json");
   if (state.accessToken) headers.set("Authorization", `Bearer ${state.accessToken}`);
   try {
-    let res = await fetch(apiUrl(path), { ...options, headers });
+    let res = await fetchWithTimeout(apiUrl(path), { ...options, headers });
     if (res.status === 401 && state.refreshToken && path !== "/auth/refresh") {
-      const refreshRes = await fetch(apiUrl("/auth/refresh"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refreshToken: state.refreshToken }) });
+      const refreshRes = await fetchWithTimeout(apiUrl("/auth/refresh"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refreshToken: state.refreshToken }) });
       const refreshData = await refreshRes.json().catch(() => ({}));
       if (refreshRes.ok && refreshData.accessToken) {
         state.accessToken = refreshData.accessToken;
         localStorage.setItem("zg_admin_access", state.accessToken);
         headers.set("Authorization", `Bearer ${state.accessToken}`);
-        res = await fetch(apiUrl(path), { ...options, headers });
+        res = await fetchWithTimeout(apiUrl(path), { ...options, headers });
       } else {
         localStorage.removeItem("zg_admin_access"); localStorage.removeItem("zg_admin_refresh"); localStorage.removeItem("zg_admin_user");
         Object.assign(state, { accessToken: "", refreshToken: "", user: null });
@@ -494,7 +502,7 @@ function renderLogin() {
   document.querySelector("#loginBtn").onclick = async () => {
     setLoading(true);
     try {
-      const data = await fetch(apiUrl("/auth/login"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: email.value.trim(), password: password.value }) }).then((r) => r.json().then((d) => r.ok ? d : Promise.reject(d)));
+      const data = await fetchWithTimeout(apiUrl("/auth/login"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: email.value.trim(), password: password.value }) }).then((r) => r.json().then((d) => r.ok ? d : Promise.reject(d)));
       Object.assign(state, { accessToken: data.accessToken, refreshToken: data.refreshToken, user: data.user });
       localStorage.setItem("zg_admin_access", data.accessToken);
       localStorage.setItem("zg_admin_refresh", data.refreshToken);
