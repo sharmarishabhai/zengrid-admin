@@ -19,7 +19,7 @@ function parseLeadImport(workbookData) {
   })).filter((lead) => lead.customerName || lead.phone);
 }
 
-const API_BASE = "https://zengridpwa-backend.onrender.com/api";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://zengridpwa-backend.onrender.com/api";
 const apiUrl = (path) => `${API_BASE}/${String(path).replace(/^\/+/, "")}`;
 const app = document.querySelector("#app");
 
@@ -75,7 +75,9 @@ const state = {
   performancePeriod: "month",
   lrmLeadPage: 1,
   lrmLeadPageSize: 25,
-  lrmLeadFilter: { q: "", status: "", assignment: "unassigned", lrmId: "" },
+  // LRM TL Lead Management starts with the complete lead set; assignment is
+  // an optional filter, not an implicit restriction.
+  lrmLeadFilter: { q: "", status: "", assignment: "", lrmId: "" },
 };
 
 const css = `
@@ -218,6 +220,9 @@ async function loadData() {
   try {
     const me = await api("/auth/me");
     state.user = me.user;
+    if (["leads", "fresh-leads", "lead-management"].includes(state.view)) {
+      return loadLeadPageData(requestId);
+    }
     const isFullLrmLeadManagement = state.user?.userType === "lrm_tl" && state.view === "lead-management";
     const leadFilter = state.view === "fresh-leads" ? {} : state.user?.userType === "lrm_tl" && !isFullLrmLeadManagement ? (state.lrmLeadFilter || { assignment: "unassigned" }) : {};
     const fullPersonalLrm = state.user?.userType === "lrm";
@@ -297,7 +302,12 @@ async function loadData() {
       reports: data[(canManageCommercialDocs() ? 10 : 7) + offset].reports || [],
       plants: isAdmin() ? data[data.length - 3].plants || [] : state.user?.userType === "sc" ? data[data.length - 1].plants || [] : [],
       maintenance: isAdmin() ? { plants: data[data.length - 2].plants || [], tasks: data[data.length - 1].tasks || [] } : state.maintenance,
-      freshLeadCount: Number(freshLeadCountResult.pagination?.total || 0),
+      // On the Fresh Leads page, use the same response as the rendered rows.
+      // This prevents a separate count request from becoming stale or showing
+      // a number that opens to an empty list.
+      freshLeadCount: state.view === "fresh-leads"
+        ? Number(data[1].pagination?.total || 0)
+        : Number(freshLeadCountResult.pagination?.total || 0),
       sidebarStatusCounts: Object.fromEntries(lrmLeadStatuses.map((status, index) => [status, Number(sidebarStatusResults[index]?.pagination?.total || 0)])),
     });
     localStorage.setItem("zg_admin_user", JSON.stringify(state.user));
@@ -311,6 +321,63 @@ async function loadData() {
     toast(e.message);
   }
   render();
+}
+
+async function loadLeadPageData(requestId = ++loadSequence) {
+  if (!state.accessToken) return renderLogin();
+  try {
+    const userType = state.user?.userType;
+    const fresh = state.view === "fresh-leads";
+    const params = new URLSearchParams({ limit: isAdmin() ? "5000" : String(state.lrmLeadPageSize || 25), page: "1" });
+    if (fresh) params.set("fresh", "true");
+    if (userType === "lrm_tl" && state.view === "leads") {
+      const filter = state.lrmLeadFilter || {};
+      if (filter.assignment) params.set("assignment", filter.assignment);
+      if (filter.status) params.set("lrmStatus", filter.status);
+      if (filter.lrmId) params.set("lrmAssignedToUserId", filter.lrmId);
+      if (filter.q) params.set("q", filter.q);
+    }
+    if (isAdmin()) {
+      const f = state.leadFilters || {};
+      if (f.q) params.set("q", f.q);
+      if (f.leadStatus) params.set("status", f.leadStatus);
+      if (f.lrmStatus) params.set("lrmStatus", f.lrmStatus);
+      if (f.source) params.set("source", f.source);
+      if (f.assignedToUserId) params.set("assignedToUserId", f.assignedToUserId);
+      if (f.assignedByUserId) params.set("assignedByUserId", f.assignedByUserId);
+      if (f.meeting) params.set("meeting", f.meeting);
+      if (f.meetingDateFrom) params.set("meetingDateFrom", f.meetingDateFrom);
+      if (f.meetingDateTo) params.set("meetingDateTo", f.meetingDateTo);
+      if (f.followUpDateFrom) params.set("followUpDateFrom", f.followUpDateFrom);
+      if (f.followUpDateTo) params.set("followUpDateTo", f.followUpDateTo);
+    }
+    const endpoint = isAdmin() ? "/leads" : "/leads/mine";
+    const requests = [api(`${endpoint}?${params.toString()}`)];
+    if (isAdmin()) requests.push(api("/users"), api("/users/lrms"), api("/users/scs"));
+    else if (["lrm", "lrm_tl"].includes(userType)) requests.push(api("/users/scs"));
+    if (userType === "lrm_tl") requests.push(api("/users/lrms"));
+    const results = await Promise.allSettled(requests);
+    if (requestId !== loadSequence) return;
+    const leadData = results[0].status === "fulfilled" ? results[0].value : { leads: [], pagination: { total: 0 } };
+    const resourceData = results.slice(1).map((result) => result.status === "fulfilled" ? result.value : {});
+    state.leads = leadData.leads || [];
+    state.lrmLeadPagination = leadData.pagination || {};
+    if (isAdmin()) {
+      state.users = resourceData.find((data) => Array.isArray(data.users) && data.users.some((u) => u.userType === "admin" || u.userType === "sc"))?.users || [];
+      state.lrms = resourceData.find((data) => Array.isArray(data.users) && data.users.some((u) => u.userType === "lrm"))?.users || [];
+      state.scs = resourceData[resourceData.length - 1]?.users || [];
+    } else {
+      state.scs = resourceData.find((data) => Array.isArray(data.users) && data.users.some((u) => u.userType === "sc"))?.users || [];
+      if (userType === "lrm_tl") state.lrms = resourceData.find((data) => Array.isArray(data.users) && data.users.some((u) => u.userType === "lrm"))?.users || [];
+    }
+    state.freshLeadCount = fresh ? Number(leadData.pagination?.total || 0) : state.freshLeadCount;
+    if (results.some((result) => result.status === "rejected")) toast("Some lead resources were unavailable; lead data loaded");
+    render();
+  } catch (error) {
+    if (requestId !== loadSequence) return;
+    toast(error.message || "Unable to load leads");
+    render();
+  }
 }
 
 async function loadLrmLeadData() {
@@ -393,7 +460,7 @@ function renderShell(content) {
   const navMarkup = nav.map(([id, label]) => `<button class="${state.view === id ? "active" : ""}" data-view="${id}"><span>${label}</span>${id === "fresh-leads" ? `<span class="nav-count" aria-label="${freshCount} fresh leads">${freshCount}</span>` : ""}</button>`).join("");
   const sidebarStatusFilter = ["lrm", "lrm_tl"].includes(state.user?.userType) ? `<div class="sidebar-status" style="display:grid!important;gap:7px!important;margin:12px 4px 0!important">${lrmLeadStatuses.filter((s) => s !== "New Lead").map((s) => { const count = state.user?.userType === "lrm_tl" ? Number(state.sidebarStatusCounts[s] || 0) : state.leads.filter((lead) => (lead.lrmStatus || "New Lead") === s).length; return `<button type="button" class="sidebar-status-btn ${((state.user?.userType === "lrm_tl" ? state.lrmLeadFilter.status : state.leadFilters.lrmStatus) === s) ? "active" : ""}" data-sidebar-status="${esc(s)}" style="display:flex!important;width:100%!important;justify-content:space-between!important">${esc(s)} <span>${count}</span></button>`; }).join("")}</div>` : "";
   app.innerHTML = `<div class="shell"><aside class="side"><div class="brand"><div class="mark"></div><div>Zen Grid Solar<div class="sub">${esc(state.user?.firstName || "User")} / ${accessLabel}</div></div></div><div class="nav">${navMarkup}${sidebarStatusFilter}</div><button class="btn danger" style="margin-top:20px;width:100%" id="logout">Logout</button></aside><main class="main">${content}</main></div>`;
-  document.querySelectorAll("[data-view]").forEach((b) => b.onclick = () => { state.view = b.dataset.view; render(); if (["lead-management", "fresh-leads"].includes(state.view)) loadData(); });
+  document.querySelectorAll("[data-view]").forEach((b) => b.onclick = () => { state.view = b.dataset.view; render(); loadData(); });
   document.querySelectorAll("[data-sidebar-status]").forEach((b) => b.onclick = () => { const status = b.dataset.sidebarStatus || ""; if (state.user?.userType === "lrm_tl") { state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), status, assignment: "" }; state.lrmLeadPage = 1; } else { state.leadFilters.lrmStatus = status; state.pages.leads = 1; } state.view = "leads"; render(); if (state.user?.userType === "lrm_tl") loadData(); });
   document.querySelector("#logout").onclick = () => { localStorage.clear(); Object.assign(state, { accessToken: "", user: null }); renderLogin(); };
 }
@@ -1027,8 +1094,8 @@ function bind() {
     lrmToolbar.append(" ", size);
     size.onchange = async () => { state.lrmLeadPageSize = Number(size.value); state.lrmLeadPage = 1; await loadLrmLeadData(); };
   }
-  document.querySelectorAll('[data-dashboard-action="leads"]').forEach((b) => b.addEventListener("click", () => { state.view = "leads"; render(); }));
-  document.querySelectorAll("[data-dashboard-status]").forEach((b) => b.addEventListener("click", () => { state.view = "leads"; state.leadFilters.leadStatus = b.dataset.dashboardStatus; state.pages.leads = 1; render(); }));
+  document.querySelectorAll('[data-dashboard-action="leads"]').forEach((b) => b.addEventListener("click", () => { state.view = "leads"; render(); loadData(); }));
+  document.querySelectorAll("[data-dashboard-status]").forEach((b) => b.addEventListener("click", () => { state.view = "leads"; state.leadFilters.leadStatus = b.dataset.dashboardStatus; state.pages.leads = 1; render(); loadData(); }));
   document.querySelector("#dashboardAddLead")?.addEventListener("click", () => modal("Add Lead", leadForm(), (data) => api("/leads", { method: "POST", body: JSON.stringify(data) })));
   document.querySelector("#dashboardViewPayments")?.addEventListener("click", () => { state.view = "records"; render(); });
   document.querySelector("#dashboardViewPerformance")?.addEventListener("click", () => { state.view = isAdmin() ? "performance-sc" : "performance"; render(); });
