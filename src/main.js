@@ -355,6 +355,17 @@ async function loadLeadPageData(requestId = ++loadSequence) {
       if (f.meetingDateTo) params.set("meetingDateTo", f.meetingDateTo);
       if (f.followUpDateFrom) params.set("followUpDateFrom", f.followUpDateFrom);
       if (f.followUpDateTo) params.set("followUpDateTo", f.followUpDateTo);
+    } else if (userType !== "lrm_tl") {
+      const f = state.leadFilters || {};
+      if (f.q) params.set("q", f.q);
+      if (f.leadStatus) params.set("status", f.leadStatus);
+      if (f.source) params.set("source", f.source);
+      if (f.lrmStatus) params.set("lrmStatus", f.lrmStatus);
+      if (f.meeting) params.set("meeting", f.meeting);
+      if (f.meetingDateFrom) params.set("meetingDateFrom", f.meetingDateFrom);
+      if (f.meetingDateTo) params.set("meetingDateTo", f.meetingDateTo);
+      if (f.followUpDateFrom) params.set("followUpDateFrom", f.followUpDateFrom);
+      if (f.followUpDateTo) params.set("followUpDateTo", f.followUpDateTo);
     }
     const endpoint = isAdmin() ? "/leads" : "/leads/mine";
     const requests = [api(`${endpoint}?${params.toString()}`)];
@@ -765,7 +776,7 @@ function leadsView() {
     <div class="mini-stat"><span class="k">Meetings</span><b>${meetings}</b></div>
     <div class="mini-stat"><span class="k">Unassigned SC</span><b>${unassigned}</b></div>
   </div>
-   <details class="card lead-filter-card" ${activeFilters ? "open" : ""}><summary><span>Lead filters${activeFilters ? " · Active" : ""}</span><span class="muted">${filtered.length} matching leads</span></summary><div class="lead-filter-body"><div class="lead-filters" style="margin:0"><div class="field"><label>Search leads</label><input data-lead-filter="q" value="${esc(f.q)}" placeholder="Name, phone, ID, email, area..."></div>${select("leadStatus", f.leadStatus, leadStatuses, "Status")}${select("source", f.source, ["Website","Social Media","Field Visit","Import"], "Source")}${select("assignedToUserId", f.assignedToUserId, state.scs.map((u) => ({ value:u._id, label:`${u.firstName} ${u.lastName}` })), "Consultant")}${select("assignedByUserId", f.assignedByUserId, state.lrms.map((u) => ({ value:u._id, label:`${u.firstName} ${u.lastName}` })), "LRM") }<div class="field"><label>Meeting</label><select data-lead-filter="meeting"><option value="">All meetings</option><option value="scheduled" ${f.meeting === "scheduled" ? "selected" : ""}>Scheduled</option><option value="done" ${f.meeting === "done" ? "selected" : ""}>Meeting Done</option></select></div><div class="field"><label>Meeting date from</label><input type="date" data-lead-filter="meetingDateFrom" value="${f.meetingDateFrom}"></div><div class="field"><label>Meeting date to</label><input type="date" data-lead-filter="meetingDateTo" value="${f.meetingDateTo}"></div><div class="field"><label>Follow-up from</label><input type="date" data-lead-filter="followUpDateFrom" value="${f.followUpDateFrom}"></div><div class="field"><label>Follow-up to</label><input type="date" data-lead-filter="followUpDateTo" value="${f.followUpDateTo}"></div></div><div class="toolbar" style="margin-bottom:0"><span class="muted">Use filters to narrow the list</span>${activeFilters ? `<button class="btn compact" id="clearLeadFilters">Clear filters</button>` : ""}</div></div></details>
+   <details class="card lead-filter-card" ${activeFilters ? "open" : ""}><summary><span>Lead filters${activeFilters ? " · Active" : ""}</span><span class="muted">${leadTotal} matching leads</span></summary><div class="lead-filter-body"><div class="lead-filters" style="margin:0"><div class="field"><label>Search leads</label><input data-lead-filter="q" value="${esc(f.q)}" placeholder="Name, phone, ID, email, area..."></div>${select("leadStatus", f.leadStatus, leadStatuses, "Status")}${select("source", f.source, ["Website","Social Media","Field Visit","Import"], "Source")}${select("assignedToUserId", f.assignedToUserId, state.scs.map((u) => ({ value:u._id, label:`${u.firstName} ${u.lastName}` })), "Consultant")}${select("assignedByUserId", f.assignedByUserId, state.lrms.map((u) => ({ value:u._id, label:`${u.firstName} ${u.lastName}` })), "LRM") }<div class="field"><label>Meeting</label><select data-lead-filter="meeting"><option value="">All meetings</option><option value="scheduled" ${f.meeting === "scheduled" ? "selected" : ""}>Scheduled</option><option value="done" ${f.meeting === "done" ? "selected" : ""}>Meeting Done</option></select></div><div class="field"><label>Meeting date from</label><input type="date" data-lead-filter="meetingDateFrom" value="${f.meetingDateFrom}"></div><div class="field"><label>Meeting date to</label><input type="date" data-lead-filter="meetingDateTo" value="${f.meetingDateTo}"></div><div class="field"><label>Follow-up from</label><input type="date" data-lead-filter="followUpDateFrom" value="${f.followUpDateFrom}"></div><div class="field"><label>Follow-up to</label><input type="date" data-lead-filter="followUpDateTo" value="${f.followUpDateTo}"></div></div><div class="toolbar" style="margin-bottom:0"><span class="muted">Use filters to narrow the list</span>${activeFilters ? `<button class="btn compact" id="clearLeadFilters">Clear filters</button>` : ""}</div></div></details>
   ${pager("leads", leadTotal)}
   <div class="lead-board">${leadRows(visibleLeads) || `<div class="empty">No leads found</div>`}</div>
   ${pager("leads", leadTotal)}`;
