@@ -335,6 +335,18 @@ async function loadData() {
   render();
 }
 
+// Navigation must invalidate the previous page request before rendering the
+// next page. Otherwise a slow response from Fresh Leads can win the race and
+// leave Lead Management showing the previous page's empty rows until refresh.
+function switchView(view) {
+  loadSequence += 1;
+  state.view = view;
+  state.leads = [];
+  state.lrmLeadPagination = {};
+  render();
+  void loadData();
+}
+
 async function loadLeadPageData(requestId = ++loadSequence) {
   if (!state.accessToken) return renderLogin();
   try {
@@ -560,8 +572,8 @@ function renderShell(content) {
   const navMarkup = nav.map(([id, label]) => `<button class="${state.view === id ? "active" : ""}" data-view="${id}"><span>${label}</span>${id === "fresh-leads" ? `<span class="nav-count" aria-label="${freshCount} fresh leads">${freshCount}</span>` : ""}</button>`).join("");
   const sidebarStatusFilter = ["lrm", "lrm_tl"].includes(state.user?.userType) ? `<div class="sidebar-status" style="display:grid!important;gap:7px!important;margin:12px 4px 0!important">${lrmLeadStatuses.filter((s) => s !== "New Lead").map((s) => { const count = state.user?.userType === "lrm_tl" ? Number(state.sidebarStatusCounts[s] || 0) : state.leads.filter((lead) => (lead.lrmStatus || "New Lead") === s).length; return `<button type="button" class="sidebar-status-btn ${((state.user?.userType === "lrm_tl" ? state.lrmLeadFilter.status : state.leadFilters.lrmStatus) === s) ? "active" : ""}" data-sidebar-status="${esc(s)}" style="display:flex!important;width:100%!important;justify-content:space-between!important">${esc(s)} <span>${count}</span></button>`; }).join("")}</div>` : "";
   app.innerHTML = `<div class="shell"><aside class="side"><div class="brand"><div class="mark"></div><div>Zen Grid Solar<div class="sub">${esc(state.user?.firstName || "User")} / ${accessLabel}</div></div></div><div class="nav">${navMarkup}${sidebarStatusFilter}</div><button class="btn danger" style="margin-top:20px;width:100%" id="logout">Logout</button></aside><main class="main">${content}</main></div>`;
-  document.querySelectorAll("[data-view]").forEach((b) => b.onclick = () => { state.view = b.dataset.view; render(); loadData(); });
-  document.querySelectorAll("[data-sidebar-status]").forEach((b) => b.onclick = () => { const status = b.dataset.sidebarStatus || ""; if (state.user?.userType === "lrm_tl") { state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), status, assignment: "" }; state.lrmLeadPage = 1; } else { state.leadFilters.lrmStatus = status; state.pages.leads = 1; } state.view = "leads"; render(); if (state.user?.userType === "lrm_tl") loadData(); });
+  document.querySelectorAll("[data-view]").forEach((b) => b.onclick = () => switchView(b.dataset.view));
+  document.querySelectorAll("[data-sidebar-status]").forEach((b) => b.onclick = () => { const status = b.dataset.sidebarStatus || ""; if (state.user?.userType === "lrm_tl") { state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), status, assignment: "" }; state.lrmLeadPage = 1; } else { state.leadFilters.lrmStatus = status; state.pages.leads = 1; } switchView("leads"); });
   document.querySelector("#logout").onclick = () => { localStorage.clear(); Object.assign(state, { accessToken: "", user: null }); renderLogin(); };
 }
 
@@ -1191,11 +1203,11 @@ function bind() {
     lrmToolbar.append(" ", size);
     size.onchange = async () => { state.lrmLeadPageSize = Number(size.value); state.lrmLeadPage = 1; await loadLrmLeadData(); };
   }
-  document.querySelectorAll('[data-dashboard-action="leads"]').forEach((b) => b.addEventListener("click", () => { state.view = "leads"; render(); loadData(); }));
-  document.querySelectorAll("[data-dashboard-status]").forEach((b) => b.addEventListener("click", () => { state.view = "leads"; state.leadFilters.leadStatus = b.dataset.dashboardStatus; state.pages.leads = 1; render(); loadData(); }));
+  document.querySelectorAll('[data-dashboard-action="leads"]').forEach((b) => b.addEventListener("click", () => switchView("leads")));
+  document.querySelectorAll("[data-dashboard-status]").forEach((b) => b.addEventListener("click", () => { state.leadFilters.leadStatus = b.dataset.dashboardStatus; state.pages.leads = 1; switchView("leads"); }));
   document.querySelector("#dashboardAddLead")?.addEventListener("click", () => modal("Add Lead", leadForm(), (data) => api("/leads", { method: "POST", body: JSON.stringify(data) })));
-  document.querySelector("#dashboardViewPayments")?.addEventListener("click", () => { state.view = "records"; render(); });
-  document.querySelector("#dashboardViewPerformance")?.addEventListener("click", () => { state.view = isAdmin() ? "performance-sc" : "performance"; render(); });
+  document.querySelector("#dashboardViewPayments")?.addEventListener("click", () => switchView("records"));
+  document.querySelector("#dashboardViewPerformance")?.addEventListener("click", () => switchView(isAdmin() ? "performance-sc" : "performance"));
   document.querySelectorAll("[data-page]").forEach((b) => b.onclick = () => {
     const [name, rawPage] = b.dataset.page.split(":");
     if (name === "leads") {
@@ -1214,7 +1226,13 @@ function bind() {
   document.querySelectorAll("[data-lead-filter]").forEach((el) => {
     const updateLeadFilter = () => { state.leadFilters[el.dataset.leadFilter] = el.value; state.pages.leads = 1; render(); loadData(); };
     el.addEventListener(el.dataset.leadFilter === "q" ? "input" : "change", () => {
-      if (el.dataset.leadFilter === "q") { clearTimeout(window.__zgAdminLeadSearchTimer); window.__zgAdminLeadSearchTimer = setTimeout(updateLeadFilter, 300); } else updateLeadFilter();
+      if (el.dataset.leadFilter === "q") {
+        const value = el.value.trim();
+        state.leadFilters.q = value;
+        clearTimeout(window.__zgAdminLeadSearchTimer);
+        if (value && value.length < 3) return;
+        window.__zgAdminLeadSearchTimer = setTimeout(updateLeadFilter, 500);
+      } else updateLeadFilter();
     });
   });
   document.querySelector("#clearLeadFilters")?.addEventListener("click", () => { Object.keys(state.leadFilters).forEach((k) => { state.leadFilters[k] = ""; }); state.pages.leads = 1; render(); loadData(); });
@@ -1224,7 +1242,13 @@ function bind() {
   document.querySelectorAll("[data-lrm-tab]").forEach((b) => b.onclick = async (e) => { e.preventDefault(); e.stopPropagation(); state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), assignment: b.dataset.lrmTab, status: b.dataset.lrmTabStatus || "", lrmId: "" }; state.lrmLeadPage = 1; await loadLrmLeadData(); });
   document.querySelectorAll("[data-lrm-tab-status]:not([data-lrm-tab])").forEach((b) => b.onclick = async (e) => { e.preventDefault(); e.stopPropagation(); state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), assignment: "", status: b.dataset.lrmTabStatus || "", lrmId: "" }; state.lrmLeadPage = 1; await loadLrmLeadData(); });
   document.querySelector("#lrmLeadOwner")?.addEventListener("change", async (e) => { state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), assignment: "", status: "", lrmId: e.target.value }; state.lrmLeadPage = 1; await loadLrmLeadData(); });
-  document.querySelector("#lrmLeadSearch")?.addEventListener("input", (e) => { clearTimeout(window.__zgLrmLeadSearchTimer); window.__zgLrmLeadSearchTimer = setTimeout(async () => { state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), q: e.target.value }; state.lrmLeadPage = 1; await loadLrmLeadData(); }, 300); });
+  document.querySelector("#lrmLeadSearch")?.addEventListener("input", (e) => {
+    const value = e.target.value.trim();
+    state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), q: value };
+    clearTimeout(window.__zgLrmLeadSearchTimer);
+    if (value && value.length < 3) return;
+    window.__zgLrmLeadSearchTimer = setTimeout(async () => { state.lrmLeadPage = 1; await loadLrmLeadData(); }, 500);
+  });
   document.querySelectorAll("[data-lrm-page]").forEach((b) => b.onclick = async () => { state.lrmLeadPage = Number(b.dataset.lrmPage); await loadLrmLeadData(); });
   document.querySelectorAll("[data-lrm-quality]").forEach((b) => b.onclick = () => { state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), status: b.dataset.lrmQuality }; render(); });
   document.querySelector("#assignSelectedLrm")?.addEventListener("click", () => {
