@@ -600,7 +600,7 @@ function leadsView() {
   const leadPool = state.view === "fresh-leads" ? state.leads.filter((l) => !l.assignedToUserId && !String(l.assignedTo || "").trim() && (l.lrmStatus || "New Lead") === "New Lead") : state.leads;
   const filtered = leadPool.filter((l) => {
     const q = f.q.toLowerCase();
-    const hay = [l.customerName, l.leadId, l.phone, l.whatsappNumber, l.email, l.area, l.locality].join(" ").toLowerCase();
+    const hay = [l.customerName, l.leadId, l.phone, l.whatsappNumber, l.email, l.address, l.area, l.locality, l.source, l.assignedTo, l.assignedBy, l.note].join(" ").toLowerCase();
     const meetingDate = l.meetingDate || ""; const followDate = l.followUpDate || "";
     const ownerId = l.lrmAssignedToUserId || l.assignedByUserId || "";
     return (!q || hay.includes(q)) && (!f.leadStatus || l.leadStatus === f.leadStatus) && (!f.lrmStatus || (l.lrmStatus || "New Lead") === f.lrmStatus) && (!f.source || l.source === f.source) && (!f.assignedToUserId || String(l.assignedToUserId || "") === f.assignedToUserId) && (!f.assignedByUserId || String(ownerId) === f.assignedByUserId) && (!f.meeting || (f.meeting === "scheduled" ? !!l.meetingDate && l.meetingStatus !== "done" : l.meetingStatus === "done")) && (!f.meetingDateFrom || meetingDate >= f.meetingDateFrom) && (!f.meetingDateTo || meetingDate <= f.meetingDateTo) && (!f.followUpDateFrom || followDate >= f.followUpDateFrom) && (!f.followUpDateTo || followDate <= f.followUpDateTo);
@@ -1045,7 +1045,7 @@ function bind() {
   document.querySelectorAll("[data-lead-filter]").forEach((el) => {
     const updateLeadFilter = () => { state.leadFilters[el.dataset.leadFilter] = el.value; state.pages.leads = 1; render(); loadData(); };
     el.addEventListener(el.dataset.leadFilter === "q" ? "input" : "change", () => {
-      if (el.dataset.leadFilter === "q") { clearTimeout(window.__zgLeadSearchTimer); window.__zgLeadSearchTimer = setTimeout(updateLeadFilter, 300); } else updateLeadFilter();
+      if (el.dataset.leadFilter === "q") { clearTimeout(window.__zgAdminLeadSearchTimer); window.__zgAdminLeadSearchTimer = setTimeout(updateLeadFilter, 300); } else updateLeadFilter();
     });
   });
   document.querySelector("#clearLeadFilters")?.addEventListener("click", () => { Object.keys(state.leadFilters).forEach((k) => { state.leadFilters[k] = ""; }); state.pages.leads = 1; render(); loadData(); });
@@ -1055,7 +1055,7 @@ function bind() {
   document.querySelectorAll("[data-lrm-tab]").forEach((b) => b.onclick = async (e) => { e.preventDefault(); e.stopPropagation(); state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), assignment: b.dataset.lrmTab, status: b.dataset.lrmTabStatus || "", lrmId: "" }; state.lrmLeadPage = 1; await loadLrmLeadData(); });
   document.querySelectorAll("[data-lrm-tab-status]:not([data-lrm-tab])").forEach((b) => b.onclick = async (e) => { e.preventDefault(); e.stopPropagation(); state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), assignment: "", status: b.dataset.lrmTabStatus || "", lrmId: "" }; state.lrmLeadPage = 1; await loadLrmLeadData(); });
   document.querySelector("#lrmLeadOwner")?.addEventListener("change", async (e) => { state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), assignment: "", status: "", lrmId: e.target.value }; state.lrmLeadPage = 1; await loadLrmLeadData(); });
-  document.querySelector("#lrmLeadSearch")?.addEventListener("change", async (e) => { state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), q: e.target.value }; state.lrmLeadPage = 1; await loadLrmLeadData(); });
+  document.querySelector("#lrmLeadSearch")?.addEventListener("input", (e) => { clearTimeout(window.__zgLrmLeadSearchTimer); window.__zgLrmLeadSearchTimer = setTimeout(async () => { state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), q: e.target.value }; state.lrmLeadPage = 1; await loadLrmLeadData(); }, 300); });
   document.querySelectorAll("[data-lrm-page]").forEach((b) => b.onclick = async () => { state.lrmLeadPage = Number(b.dataset.lrmPage); await loadLrmLeadData(); });
   document.querySelectorAll("[data-lrm-quality]").forEach((b) => b.onclick = () => { state.lrmLeadFilter = { ...(state.lrmLeadFilter || {}), status: b.dataset.lrmQuality }; render(); });
   document.querySelector("#assignSelectedLrm")?.addEventListener("click", () => {
