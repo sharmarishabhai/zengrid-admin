@@ -220,6 +220,7 @@ async function loadData() {
   try {
     const me = await api("/auth/me");
     state.user = me.user;
+    if (state.view === "dashboard") return loadDashboardPageData(requestId);
     if (["leads", "fresh-leads", "lead-management"].includes(state.view)) {
       return loadLeadPageData(requestId);
     }
@@ -376,6 +377,36 @@ async function loadLeadPageData(requestId = ++loadSequence) {
   } catch (error) {
     if (requestId !== loadSequence) return;
     toast(error.message || "Unable to load leads");
+    render();
+  }
+}
+
+async function loadDashboardPageData(requestId = ++loadSequence) {
+  try {
+    const endpoint = isAdmin() ? "/leads" : "/leads/mine";
+    const requests = [
+      api("/activities/summary"),
+      api(`${endpoint}?limit=25&page=1`),
+    ];
+    if (["lrm", "lrm_tl"].includes(state.user?.userType)) requests.push(api("/users/scs"), api("/activities/daily-reports?reportDate=" + encodeURIComponent(state.reportDateFilter)));
+    if (state.user?.userType === "lrm_tl") requests.push(api("/users/lrms"));
+    const results = await Promise.allSettled(requests);
+    if (requestId !== loadSequence) return;
+    const value = (index, fallback = {}) => results[index]?.status === "fulfilled" ? results[index].value : fallback;
+    const summary = value(0, { summary: {} });
+    const leads = value(1, { leads: [] });
+    Object.assign(state, {
+      summary: summary.summary || {},
+      leads: leads.leads || [],
+      scs: value(2, { users: [] }).users || [],
+      reports: ["lrm", "lrm_tl"].includes(state.user?.userType) ? value(3, { reports: [] }).reports || [] : state.reports,
+      lrms: state.user?.userType === "lrm_tl" ? value(4, { users: [] }).users || [] : state.lrms,
+    });
+    if (results.some((result) => result.status === "rejected")) toast("Some dashboard data was unavailable; available data loaded");
+    render();
+  } catch (error) {
+    if (requestId !== loadSequence) return;
+    toast(error.message || "Unable to load dashboard");
     render();
   }
 }
